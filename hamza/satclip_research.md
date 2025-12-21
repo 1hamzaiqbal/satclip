@@ -322,18 +322,125 @@ The spherical harmonic features feed into a 2-layer SIREN network that outputs 2
 
 ---
 
+### Experiment 01: Deep Dive (COMPLETED ✓)
+
+**Date**: 2025-12-21
+**Notebook**: `01_satclip_deep_dive.ipynb`
+**Status**: Successfully run on Google Colab with T4 GPU
+
+#### 1. Spatial Interpolation Task
+
+**Hypothesis**: L=40 should excel at predicting values *between* training grid points.
+
+**Method**: Train on regular grid, predict at cell centers (true interpolation).
+
+| Grid Spacing | L=10 R² | L=40 R² | Winner |
+|--------------|---------|---------|--------|
+| 10°          | 0.9557  | -0.1647 | **L=10** |
+| 5°           | 0.9742  | 0.7797  | **L=10** |
+| 2°           | 0.9964  | 0.9489  | **L=10** |
+| 1°           | 0.9987  | 0.9804  | **L=10** |
+
+**Surprising Result**: L=10 won ALL grid spacings, contradicting the paper's claim that L=40 is better for interpolation.
+
+**Possible explanations**:
+1. Our task may not match the paper's definition of "spatial interpolation"
+2. L=40's spiky embeddings may hurt regression even when predicting between known points
+3. The paper's interpolation tasks may involve image features, not just location encoding
+
+#### 2. Ecoregion Classification
+
+**Status**: Updated notebook with working data source.
+
+**Data Source**: RESOLVE Ecoregions 2017 (Dinerstein et al.)
+- Download: https://storage.googleapis.com/teow2016/Ecoregions2017.zip
+- 846 ecoregions, 14 biomes, 8 realms
+- Same dataset used in SatCLIP paper
+
+**Pending**: Re-run notebook with new data source.
+
+#### 3. MLP vs Logistic Regression (Checkerboard)
+
+**Question**: Can a more powerful classifier extract finer spatial information?
+
+**L=10 Results**:
+| Cell Size | ≈ km  | LogReg | MLP    | Improvement |
+|-----------|-------|--------|--------|-------------|
+| 45°       | 4995  | 94.2%  | 96.1%  | +1.9%       |
+| 20°       | 2220  | 80.3%  | 92.6%  | **+12.3%**  |
+| 10°       | 1110  | 55.6%  | 68.9%  | **+13.3%**  |
+| 5°        | 555   | 48.3%  | 51.3%  | +3.0%       |
+| 2°        | 222   | 48.8%  | 49.3%  | +0.6%       |
+| 1°        | 111   | 50.0%  | 48.7%  | -1.3%       |
+| 0.5°      | 56    | 49.8%  | 49.5%  | -0.3%       |
+
+**L=40 Results**:
+| Cell Size | ≈ km  | LogReg | MLP    | Improvement |
+|-----------|-------|--------|--------|-------------|
+| 45°       | 4995  | 63.3%  | 78.9%  | **+15.6%**  |
+| 20°       | 2220  | 58.9%  | 71.8%  | **+12.9%**  |
+| 10°       | 1110  | 56.9%  | 64.9%  | +8.0%       |
+| 5°        | 555   | 51.4%  | 58.0%  | +6.6%       |
+| 2°        | 222   | 50.3%  | 49.6%  | -0.7%       |
+| 1°        | 111   | 50.8%  | 48.4%  | -2.4%       |
+| 0.5°      | 56    | 48.3%  | 49.1%  | +0.8%       |
+
+**Key Findings**:
+1. **MLP helps significantly at medium scales** (10°-20° / 1000-2000km)
+2. **MLP extends L=10's effective resolution** from ~2000km to ~1000km (68.9% at 10°)
+3. **MLP helps L=40 more** (+5.8% avg vs +4.2% for L=10) - suggests L=40 embeddings have nonlinear structure
+4. **Below 2° (~200km), MLP doesn't help** - the information simply isn't in the embeddings
+
+#### 4. t-SNE/UMAP Visualization
+
+**Status**: Completed successfully. Plots show:
+- Both L=10 and L=40 preserve geographic structure (smooth gradients by lat/lon)
+- L=10 shows smoother, more continuous embedding space
+- L=40 shows more fragmented clusters
+
+---
+
+### Summary of All Findings
+
+| Experiment | Key Result | Implication |
+|------------|------------|-------------|
+| Distance similarity | L=40 changes faster (30% sim at 500km vs 89% for L=10) | L=40 more discriminative |
+| Checkerboard (LogReg) | L=10 wins at coarse scales, both fail <500km | ~500km effective resolution |
+| Checkerboard (MLP) | MLP extends resolution to ~1000km for L=10 | Nonlinear classifier helps |
+| Interpolation | L=10 wins ALL spacings (unexpected) | L=40 discrimination ≠ better regression |
+| Paper validation | Our results mostly align with paper | RQ1 vs RQ2 distinction confirmed |
+
+**Overall Conclusion**: SatCLIP has an effective resolution of **~500km with linear classifiers** and **~1000km with MLP**. Neither L=10 nor L=40 can reliably distinguish spatial patterns finer than this. L=10 is generally more useful for downstream tasks due to smoother embeddings.
+
+---
+
 ## Updated Next Steps
 
 1. [x] ~~Run `00_satclip_test.ipynb` in Colab to verify setup~~
 2. [x] ~~Implement embedding similarity analysis~~
 3. [x] ~~Implement checkerboard test~~
-4. [x] ~~Validate results against paper~~ → Fully consistent with paper's RQ1 vs RQ2 distinction
-5. [x] ~~Test spatial interpolation task~~ → See `01_satclip_deep_dive.ipynb`
-6. [x] ~~Ecoregion classification test~~ → See `01_satclip_deep_dive.ipynb`
-7. [x] ~~MLP classifier comparison~~ → See `01_satclip_deep_dive.ipynb`
-8. [x] ~~t-SNE/UMAP visualization~~ → See `01_satclip_deep_dive.ipynb`
-9. [ ] **Run `01_satclip_deep_dive.ipynb` in Colab** and analyze results
-10. [ ] **Document findings** from deep dive experiments
+4. [x] ~~Validate results against paper~~
+5. [x] ~~Test spatial interpolation task~~ → L=10 wins unexpectedly
+6. [x] ~~MLP classifier comparison~~ → MLP helps at medium scales
+7. [x] ~~t-SNE/UMAP visualization~~ → Geographic structure preserved
+
+### Recommended Next Steps
+
+#### High Priority (Real-World Validation)
+8. [x] ~~Find working ecoregion data~~ → RESOLVE Ecoregions 2017 added to notebook
+9. [x] ~~Test on paper's benchmark tasks~~ → Air temperature task added to notebook
+10. [ ] **Re-run `01_satclip_deep_dive.ipynb`** with updated data sources
+11. [ ] **US Census population density** - High-resolution real-world task
+
+#### Medium Priority (Understanding L=40)
+12. [ ] **Investigate interpolation failure** - Why does L=40 fail at regression despite higher discrimination?
+13. [ ] **Test with image features** - Maybe L=40 needs image encoder, not just location encoder
+14. [ ] **Fine-tune location encoder** - Can fine-tuning improve fine-scale resolution?
+
+#### Lower Priority (Extensions)
+15. [ ] **Test intermediate L values** (L=20, L=30)
+16. [ ] **Compare to other location encoders** (GeoCLIP, GPS2Vec, CSP)
+17. [ ] **Explore learned positional encodings** - Can we train a better L?
 
 ---
 
