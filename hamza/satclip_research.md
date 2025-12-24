@@ -414,6 +414,50 @@ The spherical harmonic features feed into a 2-layer SIREN network that outputs 2
 
 ---
 
+### Experiment 02: Comprehensive Resolution Tests (READY TO RUN)
+
+**Date**: 2025-12-24
+**Notebook**: `02_satclip_resolution_tests.ipynb`
+**Status**: Ready for Colab execution
+
+#### Tests Included
+
+**Paper Benchmark Replication:**
+1. **Air Temperature** (Regression) - Paper MSE ~0.25
+2. **Elevation Proxy** (Regression) - Lat-based proxy
+3. **Countries** (Classification, ~200 classes) - Paper ~96%
+4. **Biomes** (Classification, 14 classes) - Paper 94.27%
+5. **Ecoregions** (Classification, 846 classes) - Paper 91.61%
+6. **States/Provinces** (Classification, ~4000 classes) - Medium scale
+7. **Population Density Proxy** (Regression) - Paper MSE ~0.48
+
+**Multi-Scale Checkerboard:**
+- Tests at: 90°, 45°, 20°, 10°, 5°, 2°, 1°, 0.5°, 0.2°, 0.1°
+- Corresponding to: ~10000km down to ~11km
+
+**Boundary Analysis:**
+- Sharp boundaries: Countries, States (political)
+- Fuzzy boundaries: Biomes, Ecoregions (ecological)
+
+#### Data Sources
+
+| Dataset | Source | Classes |
+|---------|--------|---------|
+| Air Temperature | Figshare (paper's source) | Continuous |
+| Countries | Natural Earth 110m | ~200 |
+| States/Provinces | Natural Earth 10m | ~4000 |
+| Biomes | RESOLVE Ecoregions 2017 | 14 |
+| Ecoregions | RESOLVE Ecoregions 2017 | 846 |
+
+#### Expected Outputs
+
+1. **Results table** comparing L=10 vs L=40 across all tasks
+2. **Checkerboard resolution plot** showing effective resolution limits
+3. **Boundary sharpness analysis** comparing political vs ecological boundaries
+4. **Summary visualization** (saved as `satclip_resolution_comparison.png`)
+
+---
+
 ## Updated Next Steps
 
 1. [x] ~~Run `00_satclip_test.ipynb` in Colab to verify setup~~
