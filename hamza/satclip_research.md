@@ -592,6 +592,130 @@ The spherical harmonic features feed into a 2-layer SIREN network that outputs 2
 
 ---
 
+### Experiment 03 Results: COMPLETED ✓
+
+**Date**: 2025-12-27
+**Status**: Fully run - Major findings!
+
+#### Global Checkerboard (25 scales: 50km → 5000km)
+
+| Scale Range | L=40 Avg Advantage | Winner |
+|-------------|-------------------|--------|
+| Fine (<300km) | -0.3% | RANDOM |
+| Medium (300-1000km) | **+8.6%** | **L=40** |
+| Coarse (>1000km) | -13.5% | L=10 |
+
+**Key scales:**
+- **L=40 peak: +15.7% at 800km**
+- **Crossover: ~1000-1250km**
+- **L=10 peak: -16.4% at 4000km**
+
+#### Per-Continent Checkerboard (MAJOR FINDING!)
+
+L=40 has **MASSIVE advantages** within constrained regions:
+
+| Continent | Best L=40 Advantage | Scale |
+|-----------|---------------------|-------|
+| Europe | **+30%** | 600km |
+| South America | **+31%** | 600km |
+| Oceania | **+28%** | 500km |
+| North America | **+25%** | 600km |
+| Asia | **+22%** | 600km |
+| Africa | **+18%** | 500km |
+
+**This is a key finding**: L=40 is dramatically better than L=10 at medium scales (400-800km) when working within a specific region.
+
+#### Effective Resolution (60% accuracy threshold)
+
+| Model | Global | Per-Continent Avg |
+|-------|--------|-------------------|
+| L=10 | 900km | 600-800km |
+| L=40 | **450km** | **300-400km** |
+
+**Key insight**: L=40 can resolve ~2x finer spatial patterns than L=10!
+
+#### Interpolation (Regression)
+
+L=10 wins at ALL scales, ALL continents. Example at 500km grid:
+- L=10: R² = 0.70-0.94
+- L=40: R² = -0.5 to -2.3 (negative = worse than mean)
+
+**Confirmed**: L=40's high-frequency embeddings are unsuitable for smooth regression.
+
+#### Multi-Class Stripes
+
+| Classes | L=40 Wins | L=10 Wins | Notes |
+|---------|-----------|-----------|-------|
+| 2 | 1 (300km) | 5 | L=10 dominates above 500km |
+| 4 | 1 (200km) | 7 | L=10 dominates above 300km |
+| 8 | 1 (100km) | 8 | L=10 dominates above 200km |
+
+**Finding**: With more classes, L=10's advantage starts at finer scales.
+
+#### Summary of Key Findings
+
+1. **L=40 has 2x better effective resolution** (300-450km vs 600-900km)
+2. **L=40's sweet spot is 400-800km** globally, but up to **+30% advantage within continents**
+3. **Crossover at ~1000km** - above this, L=10 always wins
+4. **Both fail below 200-300km** - fundamental SatCLIP limit
+5. **L=10 ALWAYS wins regression** - L=40 embeddings too spiky
+6. **Regional effects are huge** - L=40 much better within-continent than globally
+
+---
+
+### Experiment 04: Deep Dive Exploration (READY TO RUN)
+
+**Date**: 2025-12-27
+**Notebook**: `04_deep_dive_exploration.ipynb`
+**Status**: Ready for Colab execution
+
+#### What This Notebook Explores
+
+Based on the major findings from Experiment 03, this notebook investigates WHY L=40 has these advantages:
+
+**1. Fine-Grained Sweet Spot Analysis (300-900km, 25km increments)**
+- Refine the exact location of L=40's peak advantage
+- 25 scales: 300, 325, 350, ..., 900km
+- Global checkerboard at each scale
+
+**2. Region Size Effect**
+- Test 500km checkerboard at varying region sizes (10° to 180°)
+- Answers: Why does L=40 have larger advantages within continents?
+- Tests if region constraint is the key factor
+
+**3. Pattern Complexity Test**
+- 5 pattern types: checkerboard, horizontal stripes, vertical stripes, diagonal stripes, concentric rings
+- 5 scales: 400, 600, 800, 1000, 1500km
+- Answers: Does pattern type affect L=40's advantage?
+
+**4. Embedding Similarity vs Distance**
+- Measure cosine similarity decay from reference point
+- Distances: 10km to 3000km
+- Quantify exactly how much faster L=40 embeddings change
+
+**5. Boundary Sharpness Detection**
+- Test classification with varying boundary widths (0km to 2000km)
+- Answers: Does L=40 prefer sharp or gradual boundaries?
+
+#### Expected Outputs
+
+1. `sweet_spot_fine.png` - High-resolution L=40 advantage curve
+2. `region_size_effect.png` - How region size affects L=40 advantage
+3. `pattern_complexity.png` - Heatmap of pattern type × scale
+4. `embedding_similarity.png` - Similarity decay curves
+5. `boundary_sharpness.png` - Performance by boundary width
+6. `deep_dive_results.json` - All raw results
+
+#### Key Questions This Answers
+
+1. **Exact sweet spot**: Is it 600km? 700km? 800km?
+2. **Why do regions matter?**: What about smaller regions helps L=40?
+3. **Pattern effects**: Do some patterns suit L=40 better?
+4. **Embedding mechanics**: Can we quantify the discrimination difference?
+5. **Boundary handling**: Sharp vs gradual - which does L=40 prefer?
+
+---
+
 ## Updated Next Steps
 
 1. [x] ~~Run `00_satclip_test.ipynb` in Colab to verify setup~~
