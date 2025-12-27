@@ -663,56 +663,102 @@ L=10 wins at ALL scales, ALL continents. Example at 500km grid:
 
 ---
 
-### Experiment 04: Deep Dive Exploration (READY TO RUN)
+### Experiment 04: Deep Dive Exploration (COMPLETED ✓)
 
 **Date**: 2025-12-27
 **Notebook**: `04_deep_dive_exploration.ipynb`
-**Status**: Ready for Colab execution
+**Status**: Completed - Major findings on L=40's effective resolution characteristics!
 
-#### What This Notebook Explores
+#### 1. Fine-Grained Sweet Spot (300-900km, 25km steps)
 
-Based on the major findings from Experiment 03, this notebook investigates WHY L=40 has these advantages:
+| Scale Range | L=40 Advantage | Notes |
+|-------------|----------------|-------|
+| 300-400km | +1% to +5% | Both near random |
+| 450-550km | +9% to +13% | L=40 starting to dominate |
+| **575-800km** | **+12% to +16%** | **L=40's PEAK ZONE** |
+| 825-900km | +0% to +8% | L=10 catching up |
 
-**1. Fine-Grained Sweet Spot Analysis (300-900km, 25km increments)**
-- Refine the exact location of L=40's peak advantage
-- 25 scales: 300, 325, 350, ..., 900km
-- Global checkerboard at each scale
+**Key finding**: L=40's peak advantage is **+16.2% at 675km** (globally)
 
-**2. Region Size Effect**
-- Test 500km checkerboard at varying region sizes (10° to 180°)
-- Answers: Why does L=40 have larger advantages within continents?
-- Tests if region constraint is the key factor
+#### 2. Region Size Effect (MAJOR FINDING!)
 
-**3. Pattern Complexity Test**
-- 5 pattern types: checkerboard, horizontal stripes, vertical stripes, diagonal stripes, concentric rings
-- 5 scales: 400, 600, 800, 1000, 1500km
-- Answers: Does pattern type affect L=40's advantage?
+Testing 500km checkerboard at varying region sizes (centered on Europe):
 
-**4. Embedding Similarity vs Distance**
-- Measure cosine similarity decay from reference point
-- Distances: 10km to 3000km
-- Quantify exactly how much faster L=40 embeddings change
+| Region Size | ≈ km | L=10 | L=40 | Δ |
+|-------------|------|------|------|---|
+| 10° | 1110 | 92.2% | 96.5% | +4.3% |
+| 20° | 2220 | 87.9% | 93.1% | +5.2% |
+| **30°** | **3330** | **61.3%** | **92.2%** | **+30.9%** ← PEAK |
+| 50° | 5550 | 60.8% | 85.8% | +24.9% |
+| 75° | 8325 | 57.0% | 82.2% | +25.3% |
+| 100° | 11100 | 55.8% | 74.2% | +18.4% |
+| 180° (global) | 19980 | 52.2% | 62.6% | +10.4% |
 
-**5. Boundary Sharpness Detection**
-- Test classification with varying boundary widths (0km to 2000km)
-- Answers: Does L=40 prefer sharp or gradual boundaries?
+**Critical insight**: L=40's advantage is NON-LINEAR with region size!
+- Peak at ~30° regions (3300km span), NOT smallest regions
+- L=40 needs some geographic diversity but too large dilutes advantage
+- Explains why per-continent results were so strong in Experiment 03
 
-#### Expected Outputs
+#### 3. Pattern Complexity (1D vs 2D)
 
-1. `sweet_spot_fine.png` - High-resolution L=40 advantage curve
-2. `region_size_effect.png` - How region size affects L=40 advantage
-3. `pattern_complexity.png` - Heatmap of pattern type × scale
-4. `embedding_similarity.png` - Similarity decay curves
-5. `boundary_sharpness.png` - Performance by boundary width
-6. `deep_dive_results.json` - All raw results
+| Pattern | Avg L=40 Advantage | Notes |
+|---------|-------------------|-------|
+| **checkerboard** | **+4.4%** | Best - requires 2D discrimination |
+| diagonal_stripes | +1.2% | Moderate - mixed 1D/2D |
+| vertical_stripes | -2.8% | L=10 better |
+| concentric_rings | -4.4% | L=10 better |
+| horizontal_stripes | -8.4% | Worst - pure 1D (latitude) |
 
-#### Key Questions This Answers
+**Key insight**: L=40 excels at 2D spatial patterns, L=10 better at 1D patterns.
+- Horizontal stripes (latitude bands) strongly favor L=10
+- This suggests L=40 captures complex 2D local structure
 
-1. **Exact sweet spot**: Is it 600km? 700km? 800km?
-2. **Why do regions matter?**: What about smaller regions helps L=40?
-3. **Pattern effects**: Do some patterns suit L=40 better?
-4. **Embedding mechanics**: Can we quantify the discrimination difference?
-5. **Boundary handling**: Sharp vs gradual - which does L=40 prefer?
+#### 4. Embedding Similarity vs Distance
+
+| Distance | L=10 Similarity | L=40 Similarity |
+|----------|-----------------|-----------------|
+| 100km | 0.997 | 0.966 |
+| 300km | 0.978 | 0.753 |
+| 500km | 0.943 | **0.539** |
+| 1000km | 0.830 | 0.285 |
+| 2000km | 0.451 | 0.061 |
+
+- L=40 similarity drops below 0.5 at ~500km
+- L=10 similarity drops below 0.5 at ~2000km
+- **L=40 discriminates 4x faster** at medium distances
+
+#### 5. Boundary Sharpness Detection
+
+| Boundary Width | L=10 | L=40 | Δ |
+|----------------|------|------|---|
+| Sharp (0km) | 99.4% | 90.1% | -9.3% |
+| 100km | 98.9% | 89.1% | -9.8% |
+| 500km | 96.3% | 87.3% | -8.9% |
+| 2000km | 88.2% | 79.1% | -9.1% |
+
+**L=10 always wins boundary detection** (~9% advantage regardless of sharpness)
+
+#### Summary of Key Findings
+
+1. **L=40's SWEET SPOT**: 450-800km (peak +16.2% at 675km globally)
+
+2. **REGION SIZE IS NON-LINEAR**:
+   - Peak L=40 advantage at ~30° regions: **+30.9%**
+   - NOT smallest region - L=40 needs some geographic diversity
+   - Global scale dilutes advantage to +10%
+
+3. **PATTERN TYPE MATTERS**: L=40 excels at 2D patterns
+   - Checkerboard: +4.4% (2D discrimination)
+   - Horizontal stripes: -8.4% (1D latitude bands)
+   - L=40 captures complex 2D local structure
+
+4. **BOUNDARY DETECTION**: L=10 always wins (~9%)
+   - Simple hemisphere classification favors smooth embeddings
+
+5. **PRACTICAL RECOMMENDATIONS**:
+   - For 400-800km tasks within a ~3000km region: **USE L=40**
+   - For 2D pattern discrimination: **USE L=40**
+   - For regression, boundaries, or coarse tasks: **USE L=10**
 
 ---
 
