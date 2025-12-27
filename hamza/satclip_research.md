@@ -532,6 +532,66 @@ The spherical harmonic features feed into a 2-layer SIREN network that outputs 2
 
 ---
 
+### Experiment 03: Comprehensive Resolution Sweep (READY TO RUN)
+
+**Date**: 2025-12-27
+**Notebook**: `03_resolution_sweep.ipynb`
+**Status**: Ready for Colab execution
+
+#### What This Notebook Tests
+
+**Fine-Grained Scale Sweep (25 scales):**
+```
+50, 75, 100, 125, 150, 175, 200,      # Fine (likely random)
+250, 300, 350, 400, 450, 500,          # Medium-fine (L=40 sweet spot?)
+600, 700, 800, 900, 1000,              # Medium (crossover zone)
+1250, 1500, 2000, 2500,                # Medium-coarse
+3000, 4000, 5000                       # Coarse (L=10 dominates)
+```
+
+**Tests Included:**
+
+1. **Global Checkerboard Sweep** (25 scales)
+   - Binary classification at each scale
+   - Find exact crossover points
+
+2. **Per-Continent Checkerboard** (6 continents × 11 scales)
+   - North America, South America, Europe, Africa, Asia, Oceania
+   - Find regional variations in L=40 advantage
+   - Heatmap visualization
+
+3. **Per-Continent Interpolation** (6 continents × 8 scales)
+   - Train on grid, test at cell centers
+   - Average R² across continents
+   - Find if L=40 ever wins at interpolation
+
+4. **Multi-Class Stripe Test** (2, 4, 8 classes)
+   - Beyond binary classification
+   - Test at multiple granularities
+
+5. **Effective Resolution Analysis**
+   - Find where accuracy drops below 60% and 70% thresholds
+   - Compare L=10 vs L=40 limits
+   - Per-continent breakdown
+
+#### Expected Outputs
+
+1. `global_checkerboard_sweep.png` - Full 25-scale sweep
+2. `continent_heatmap.png` - L=40 advantage by region and scale
+3. `interpolation_sweep.png` - Regression R² curves
+4. `stripe_test.png` - Multi-class results
+5. `comprehensive_resolution_sweep.png` - 6-panel summary
+6. `resolution_sweep_results.json` - All raw data
+
+#### Key Questions This Answers
+
+1. **Where exactly is L=40's sweet spot?** (300-700km based on prior results)
+2. **Does L=40 advantage vary by continent?** (Expect yes based on satellite coverage)
+3. **Does L=40 EVER win at interpolation?** (Expect no based on prior results)
+4. **What is the true effective resolution limit?** (~200km for both models)
+
+---
+
 ## Updated Next Steps
 
 1. [x] ~~Run `00_satclip_test.ipynb` in Colab to verify setup~~
