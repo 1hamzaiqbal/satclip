@@ -795,62 +795,164 @@ Tested 5 scales × 6 region sizes × 3 continents:
 
 ---
 
-### Experiment 05: Real-World Fine-Grained Resolution Tests (READY TO RUN)
+### Experiment 05: Real-World Fine-Grained Resolution Tests (COMPLETED ✓)
 
 **Date**: 2025-12-27
 **Notebook**: `05_real_world_resolution.ipynb`
-**Status**: Ready for Colab execution
+**Status**: Completed - **MAJOR SURPRISING FINDINGS!**
 
 #### Purpose
 
-Validate synthetic findings (Experiments 00-04) against **real-world fine-grained tasks** to answer:
-- Does L=40's advantage at 400-800km synthetic scales translate to real-world tasks?
-- Can either model handle county-level (~50km) or city-level (~40km) classification?
-- Does L=10 still dominate regression on real population density proxies?
+Validate synthetic findings (Experiments 00-04) against **real-world fine-grained tasks**.
 
-#### Tests Included
+#### Results Summary
 
-1. **US County Classification (~3,000 classes)**
-   - Real administrative boundaries from Natural Earth 10m data
-   - Average county size: ~2,500 km² → ~50km linear scale
-   - Tests: Can SatCLIP distinguish individual US counties?
+##### 1. US County Classification (~40km scale, 1910 classes) - **SURPRISING!**
 
-2. **Multi-Scale US Grid Test (50km → 1000km)**
-   - Grid overlay on continental US at 10 scales
-   - Directly measures effective resolution on real geography
-   - Finds crossover point where L=40 advantage begins
+| Model | Accuracy | Top-5 Accuracy |
+|-------|----------|----------------|
+| L=10 | 53.4% | 81.0% |
+| **L=40** | **67.5%** | **92.4%** |
+| **Δ** | **+14.1%** | **+11.4%** |
 
-3. **Population Density Proxy Regression**
-   - Synthetic proxy based on latitude + coastal effects
-   - Tests at 7 region sizes (10° to 180°)
-   - Validates L=10's regression advantage on population-like task
+**This contradicts our synthetic predictions!** We expected both models to fail at ~40km scale, but L=40 achieves 67.5% accuracy on 1910-class county classification. This suggests **real-world geographic boundaries are more distinguishable than synthetic checkerboard patterns**.
 
-4. **City-Level Classification (10 major US cities)**
-   - Urban areas at ~40km scale
-   - New York, LA, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, San Jose
-   - Tests very fine-grained urban discrimination
+##### 2. Multi-Scale US Grid Test (50km → 1000km) - **L=40 DOMINATES!**
 
-5. **European Country Classification**
-   - Natural Earth 110m countries
-   - Europe has many small countries → tests fine boundaries
-   - Validates per-continent findings from Experiment 03
+| Scale | # Classes | L=10 | L=40 | Δ | Winner |
+|-------|-----------|------|------|---|--------|
+| 50km | 4940 | 23.0% | 28.5% | +5.5% | L=40 |
+| 75km | 3086 | 38.3% | 46.0% | +7.6% | L=40 |
+| 100km | 1931 | 50.6% | 58.7% | +8.1% | L=40 |
+| **150km** | 888 | 54.0% | 74.2% | **+20.2%** | **L=40 PEAK** |
+| 200km | 509 | 72.6% | 83.0% | +10.3% | L=40 |
+| 300km | 252 | 80.1% | 90.6% | +10.5% | L=40 |
+| 400km | 136 | 89.1% | 92.6% | +3.5% | L=40 |
+| 500km | 98 | 91.2% | 92.8% | +1.5% | ~Same |
+| 750km | 50 | 95.1% | 96.4% | +1.2% | ~Same |
+| 1000km | 28 | 95.1% | 95.9% | +0.8% | ~Same |
 
-#### Expected Findings (Based on Synthetic Results)
+**Key insight**: L=40 wins at **ALL scales from 50km to 400km**! No crossover to L=10 in this range.
 
-| Task | Predicted Winner | Rationale |
-|------|-----------------|-----------|
-| US Counties (~50km) | RANDOM or slight L=40 | Below both models' effective resolution |
-| US Grid 500-800km | **L=40** | In L=40's sweet spot |
-| US Grid >1000km | **L=10** | Above crossover point |
-| Population Regression | **L=10** | L=10 always wins regression |
-| City Classification (~40km) | RANDOM | Far below effective resolution |
-| European Countries | Slight **L=40** | Medium scale + constrained region |
+**Effective Resolution Thresholds (Real-World US Grid):**
+| Threshold | L=10 Needs | L=40 Needs | L=40 Improvement |
+|-----------|------------|------------|------------------|
+| 60% | 200km | 100km | **2x finer** |
+| 70% | 200km | 150km | **1.3x finer** |
+| 80% | 300km | 200km | **1.5x finer** |
+
+##### 3. Population Density Proxy Regression - **L=10 ALWAYS WINS**
+
+| Region | L=10 R² | L=40 R² | Winner |
+|--------|---------|---------|--------|
+| 10° (1110km) | 0.564 | 0.520 | L=10 |
+| 20° (2220km) | 0.792 | 0.754 | L=10 |
+| 30° (3330km) | 0.848 | 0.772 | L=10 |
+| 50° (5550km) | 0.861 | 0.724 | L=10 |
+| 75° (8325km) | 0.834 | 0.551 | L=10 |
+| 100° (11100km) | 0.801 | 0.183 | L=10 |
+| 180° (global) | 0.702 | **-1.159** | L=10 |
+
+**Average R²**: L=10 = 0.772, L=40 = 0.335
+
+**Confirms**: L=10 always wins regression. L=40 gets negative R² at global scale.
+
+##### 4. City-Level Classification (10 cities, ~54km scale)
+
+| Classifier | L=10 | L=40 | Δ |
+|------------|------|------|---|
+| Logistic Reg | 100% | 100% | 0% |
+| MLP | 100% | 100% | 0% |
+
+**Both perfect** - cities are geographically far apart (>1000km between most), making this trivially solvable.
+
+##### 5. European Country Classification (39 countries)
+
+| Model | Accuracy |
+|-------|----------|
+| L=10 | 97.8% |
+| L=40 | 97.8% |
+
+**Same performance** - European countries are well-separated at this resolution.
+
+#### Key Findings vs Predictions
+
+| Prediction | Actual Result | Status |
+|------------|---------------|--------|
+| Counties (~40km): RANDOM | L=40: 67.5%, +14% advantage | ❌ **WRONG** |
+| Grid 500-800km: L=40 wins | L=40 wins at ALL scales 50-400km | ✅ Correct (but broader) |
+| Grid >1000km: L=10 wins | Both ~same above 500km | ⚠️ Partially |
+| Regression: L=10 wins | L=10 wins at ALL scales | ✅ **CONFIRMED** |
+| Cities (~40km): RANDOM | Both 100% | ❌ **WRONG** (cities too far apart) |
+| Europe: Slight L=40 | Both 97.8% | ⚠️ Same |
+
+#### Major Insights
+
+1. **Real-world boundaries ≠ synthetic checkerboards**: County boundaries follow natural/political features that may align with what SatCLIP learned from satellite imagery. The ~40km "effective resolution limit" doesn't apply the same way to real administrative boundaries.
+
+2. **L=40's advantage extends MUCH finer than synthetic tests suggested**: Peak advantage at 150km (+20.2%), not 675km as in synthetic tests. L=40 beats L=10 even at 50km.
+
+3. **The US is a constrained region (~3000km)**: This matches the "sweet spot" we found in Experiment 04 - L=40 excels within continent-sized regions.
+
+4. **Regression remains L=10's domain**: No change here - L=40 still catastrophically fails on smooth prediction tasks.
+
+5. **City classification is deceptively easy**: The 10 major US cities are all >500km apart, so this doesn't actually test fine-grained resolution.
+
+#### Updated Effective Resolution Estimates
+
+Based on real-world US grid test:
+
+| Model | 60% Threshold | 70% Threshold |
+|-------|---------------|---------------|
+| L=10 | ~200km | ~200km |
+| **L=40** | **~100km** | **~150km** |
+
+**L=40 achieves ~2x finer effective resolution on real-world US geography!**
 
 #### Outputs Generated
 
 - `us_grid_resolution.png` - Multi-scale accuracy curves
 - `real_world_resolution.png` - Summary 4-panel visualization
-- `real_world_results.json` - All raw results for analysis
+- `real_world_results.json` - All raw results
+
+---
+
+### Experiment 06: Extended Resolution Tests (READY TO RUN)
+
+**Date**: 2025-12-27
+**Notebook**: `06_extended_resolution.ipynb`
+**Status**: Ready for Colab execution
+
+#### Purpose
+
+Push the resolution limits further based on Experiment 05's surprising findings.
+
+#### Tests Included
+
+1. **Ultra-Fine Grid Scales (5km → 100km)**
+   - Push below 50km to find true resolution floor
+   - Scales: 5, 10, 15, 20, 25, 30, 40, 50, 75, 100km
+
+2. **Within-State Classification**
+   - California, Texas, Florida, New York, Pennsylvania
+   - County classification in very constrained regions (~500-1000km extent)
+   - Tests if L=40 advantage holds in small areas
+
+3. **Multi-Region Comparison**
+   - US, Europe, East Asia, South America, Australia
+   - Same scales (25, 50, 100, 200, 400km) across regions
+   - Identifies if some regions favor L=40 more
+
+4. **Region Size Effect at Fine Scales**
+   - 50km grid at varying region sizes (5° → 60°)
+   - Tests non-linear region size effect at fine resolution
+
+#### Expected Outputs
+
+- `ultra_fine_resolution.png` - Accuracy curves at 5-100km
+- `multi_region_comparison.png` - Heatmap of L=40 advantage by region/scale
+- `region_size_effect_fine.png` - Region size effect at 50km
+- `extended_resolution_results.json` - All raw data
 
 ---
 
@@ -871,7 +973,7 @@ Validate synthetic findings (Experiments 00-04) against **real-world fine-graine
 9. [x] ~~Test on paper's benchmark tasks~~ → Air temperature task added to notebook
 10. [ ] **Re-run `01_satclip_deep_dive.ipynb`** with updated data sources
 11. [x] ~~**US Census population density**~~ → Created `05_real_world_resolution.ipynb` with county, city, and grid tests
-12. [ ] **Run `05_real_world_resolution.ipynb` in Colab** - Will validate synthetic findings with real-world data
+12. [x] ~~**Run `05_real_world_resolution.ipynb` in Colab**~~ → **Major findings!** L=40 achieves 67.5% on county classification, wins at ALL scales 50-400km
 
 #### Medium Priority (Understanding L=40)
 13. [ ] **Investigate interpolation failure** - Why does L=40 fail at regression despite higher discrimination?
@@ -889,13 +991,15 @@ Validate synthetic findings (Experiments 00-04) against **real-world fine-graine
 
 ### Executive Summary
 
-This investigation comprehensively characterized the **effective spatial resolution** of SatCLIP's location encoder, comparing L=10 (100 spherical harmonic features) vs L=40 (1600 features) across 5 notebooks and dozens of experiments.
+This investigation comprehensively characterized the **effective spatial resolution** of SatCLIP's location encoder, comparing L=10 (100 spherical harmonic features) vs L=40 (1600 features) across 6 notebooks and dozens of experiments.
 
 **The TL;DR:**
-- L=40 has **2x better effective resolution** (300-450km vs 600-900km)
-- L=40's sweet spot is **450-800km within ~3000km regions** (up to +31% advantage)
-- L=10 wins at **all regression tasks** and **coarse-scale (>1000km) classification**
-- **Neither model can resolve patterns finer than ~200-300km** - this is a fundamental SatCLIP limit
+- L=40 has **2x better effective resolution** than L=10 consistently
+- **Synthetic tests**: L=40 resolves to 300-450km vs L=10's 600-900km
+- **Real-world tests**: L=40 resolves to **~100km** vs L=10's ~200km (much finer than expected!)
+- L=40's peak advantage: **+20% at 150km** (real-world US grid), +16% at 675km (synthetic global)
+- L=10 wins at **all regression tasks** - L=40 gets negative R² at large scales
+- **County-level classification (~40km, 1910 classes)**: L=40 achieves **67.5%** accuracy (+14% over L=10) - real boundaries are easier than synthetic patterns
 
 ---
 
@@ -908,6 +1012,7 @@ This investigation comprehensively characterized the **effective spatial resolut
 | **02** | Resolution Tests | Crossover at 555km; L=40 catastrophic on regression |
 | **03** | Comprehensive Sweep | L=40 has +25-31% advantage within continents |
 | **04** | Deep Exploration | Non-linear region size effect; 2D patterns favor L=40 |
+| **05** | Real-World Tests | **L=40 wins at ALL scales 50-400km on real US geography!** |
 
 ---
 
@@ -915,12 +1020,19 @@ This investigation comprehensively characterized the **effective spatial resolut
 
 #### Effective Resolution Limits
 
+**Synthetic Tests (Global Checkerboard):**
 | Model | 60% Accuracy Threshold | 70% Accuracy Threshold |
 |-------|------------------------|------------------------|
 | L=10 | 600-900km | 1000-1500km |
 | **L=40** | **300-450km** | **500-700km** |
 
-**L=40 achieves ~2x finer effective resolution than L=10.**
+**Real-World Tests (US Grid - Experiment 05):**
+| Model | 60% Accuracy Threshold | 70% Accuracy Threshold |
+|-------|------------------------|------------------------|
+| L=10 | ~200km | ~200km |
+| **L=40** | **~100km** | **~150km** |
+
+**Key insight**: Real-world resolution is ~3x finer than synthetic tests predicted! L=40 achieves ~2x finer effective resolution than L=10 in both cases.
 
 #### L=40 Advantage by Scale (Global Checkerboard)
 
@@ -1040,9 +1152,11 @@ This investigation comprehensively characterized the **effective spatial resolut
 - You need **smooth, generalizable embeddings**
 
 #### NEITHER MODEL IS SUITABLE WHEN:
-- Patterns are **finer than ~200-300km**
-- Task requires **city-level or finer resolution**
+- Patterns are **finer than ~50-100km** (based on real-world tests)
+- Task requires **neighborhood-level or finer resolution**
 - You need **street-level geolocation**
+
+**Note**: Real-world geographic boundaries (counties, countries) are easier to classify than synthetic checkerboard patterns at equivalent scales. L=40 achieved 67.5% on 1910-class US county classification (~40km scale).
 
 ---
 
@@ -1050,12 +1164,13 @@ This investigation comprehensively characterized the **effective spatial resolut
 
 | Metric | Value |
 |--------|-------|
-| Total experiments | 5 notebooks |
-| Total test configurations | 200+ |
+| Total experiments | 6 notebooks |
+| Total test configurations | 250+ |
 | Scales tested | 50km to 10,000km |
-| Patterns tested | 5 types |
+| Patterns tested | 5 synthetic + 4 real-world |
 | Continents tested | 6 |
 | Region sizes tested | 10° to 180° |
+| Real-world tasks | US counties, US grid, EU countries, cities, pop density |
 
 ---
 
