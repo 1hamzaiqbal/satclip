@@ -738,6 +738,39 @@ Testing 500km checkerboard at varying region sizes (centered on Europe):
 
 **L=10 always wins boundary detection** (~9% advantage regardless of sharpness)
 
+#### 6. Scale × Region Size Grid Search (NEW!)
+
+Tested 5 scales × 6 region sizes × 3 continents:
+
+**Per-Continent Results (400km scale, L=40 advantage):**
+
+| Region Size | Europe | North America | Asia |
+|-------------|--------|---------------|------|
+| 15° | +36.7% | +9.9% | +7.0% |
+| 25° | **+40.1%** | +12.3% | +11.2% |
+| 35° | +35.0% | +25.6% | +29.6% |
+| 45° | +23.3% | +27.6% | +32.7% |
+| 60° | +24.6% | +20.0% | +13.2% |
+| 90° | +21.2% | +12.7% | +17.8% |
+
+**🏆 OPTIMAL COMBINATION FOUND:**
+- **Region**: Europe at 25° (~2775km span)
+- **Scale**: 400km cells
+- **L=40 Advantage**: **+40.1%**
+
+**Sweet Spot by Region Size (Averaged Across Continents):**
+
+| Region Size | Best Scale | L=40 Advantage |
+|-------------|------------|----------------|
+| 15° | 400km | +17.9% |
+| 25° | 400km | +21.2% |
+| 35° | 400km | +30.1% |
+| 45° | 500km | +30.1% |
+| 60° | 600km | +22.1% |
+| 90° | 500km | +22.6% |
+
+**Key insight**: Smaller scales (400km) work best with smaller regions (15-35°), while larger regions need larger scales (500-600km).
+
 #### Summary of Key Findings
 
 1. **L=40's SWEET SPOT**: 450-800km (peak +16.2% at 675km globally)
@@ -762,6 +795,65 @@ Testing 500km checkerboard at varying region sizes (centered on Europe):
 
 ---
 
+### Experiment 05: Real-World Fine-Grained Resolution Tests (READY TO RUN)
+
+**Date**: 2025-12-27
+**Notebook**: `05_real_world_resolution.ipynb`
+**Status**: Ready for Colab execution
+
+#### Purpose
+
+Validate synthetic findings (Experiments 00-04) against **real-world fine-grained tasks** to answer:
+- Does L=40's advantage at 400-800km synthetic scales translate to real-world tasks?
+- Can either model handle county-level (~50km) or city-level (~40km) classification?
+- Does L=10 still dominate regression on real population density proxies?
+
+#### Tests Included
+
+1. **US County Classification (~3,000 classes)**
+   - Real administrative boundaries from Natural Earth 10m data
+   - Average county size: ~2,500 km² → ~50km linear scale
+   - Tests: Can SatCLIP distinguish individual US counties?
+
+2. **Multi-Scale US Grid Test (50km → 1000km)**
+   - Grid overlay on continental US at 10 scales
+   - Directly measures effective resolution on real geography
+   - Finds crossover point where L=40 advantage begins
+
+3. **Population Density Proxy Regression**
+   - Synthetic proxy based on latitude + coastal effects
+   - Tests at 7 region sizes (10° to 180°)
+   - Validates L=10's regression advantage on population-like task
+
+4. **City-Level Classification (10 major US cities)**
+   - Urban areas at ~40km scale
+   - New York, LA, Chicago, Houston, Phoenix, Philadelphia, San Antonio, San Diego, Dallas, San Jose
+   - Tests very fine-grained urban discrimination
+
+5. **European Country Classification**
+   - Natural Earth 110m countries
+   - Europe has many small countries → tests fine boundaries
+   - Validates per-continent findings from Experiment 03
+
+#### Expected Findings (Based on Synthetic Results)
+
+| Task | Predicted Winner | Rationale |
+|------|-----------------|-----------|
+| US Counties (~50km) | RANDOM or slight L=40 | Below both models' effective resolution |
+| US Grid 500-800km | **L=40** | In L=40's sweet spot |
+| US Grid >1000km | **L=10** | Above crossover point |
+| Population Regression | **L=10** | L=10 always wins regression |
+| City Classification (~40km) | RANDOM | Far below effective resolution |
+| European Countries | Slight **L=40** | Medium scale + constrained region |
+
+#### Outputs Generated
+
+- `us_grid_resolution.png` - Multi-scale accuracy curves
+- `real_world_resolution.png` - Summary 4-panel visualization
+- `real_world_results.json` - All raw results for analysis
+
+---
+
 ## Updated Next Steps
 
 1. [x] ~~Run `00_satclip_test.ipynb` in Colab to verify setup~~
@@ -778,17 +870,202 @@ Testing 500km checkerboard at varying region sizes (centered on Europe):
 8. [x] ~~Find working ecoregion data~~ → RESOLVE Ecoregions 2017 added to notebook
 9. [x] ~~Test on paper's benchmark tasks~~ → Air temperature task added to notebook
 10. [ ] **Re-run `01_satclip_deep_dive.ipynb`** with updated data sources
-11. [ ] **US Census population density** - High-resolution real-world task
+11. [x] ~~**US Census population density**~~ → Created `05_real_world_resolution.ipynb` with county, city, and grid tests
+12. [ ] **Run `05_real_world_resolution.ipynb` in Colab** - Will validate synthetic findings with real-world data
 
 #### Medium Priority (Understanding L=40)
-12. [ ] **Investigate interpolation failure** - Why does L=40 fail at regression despite higher discrimination?
-13. [ ] **Test with image features** - Maybe L=40 needs image encoder, not just location encoder
-14. [ ] **Fine-tune location encoder** - Can fine-tuning improve fine-scale resolution?
+13. [ ] **Investigate interpolation failure** - Why does L=40 fail at regression despite higher discrimination?
+14. [ ] **Test with image features** - Maybe L=40 needs image encoder, not just location encoder
+15. [ ] **Fine-tune location encoder** - Can fine-tuning improve fine-scale resolution?
 
 #### Lower Priority (Extensions)
-15. [ ] **Test intermediate L values** (L=20, L=30)
-16. [ ] **Compare to other location encoders** (GeoCLIP, GPS2Vec, CSP)
-17. [ ] **Explore learned positional encodings** - Can we train a better L?
+16. [ ] **Test intermediate L values** (L=20, L=30)
+17. [ ] **Compare to other location encoders** (GeoCLIP, GPS2Vec, CSP)
+18. [ ] **Explore learned positional encodings** - Can we train a better L?
+
+---
+
+## HOLISTIC SUMMARY: Complete Investigation Findings
+
+### Executive Summary
+
+This investigation comprehensively characterized the **effective spatial resolution** of SatCLIP's location encoder, comparing L=10 (100 spherical harmonic features) vs L=40 (1600 features) across 5 notebooks and dozens of experiments.
+
+**The TL;DR:**
+- L=40 has **2x better effective resolution** (300-450km vs 600-900km)
+- L=40's sweet spot is **450-800km within ~3000km regions** (up to +31% advantage)
+- L=10 wins at **all regression tasks** and **coarse-scale (>1000km) classification**
+- **Neither model can resolve patterns finer than ~200-300km** - this is a fundamental SatCLIP limit
+
+---
+
+### Investigation Timeline
+
+| Experiment | Focus | Key Discovery |
+|------------|-------|---------------|
+| **00** | Setup & Basic Tests | L=40 embeddings change faster with distance |
+| **01** | Deep Dive | MLP extends effective resolution; L=10 wins interpolation |
+| **02** | Resolution Tests | Crossover at 555km; L=40 catastrophic on regression |
+| **03** | Comprehensive Sweep | L=40 has +25-31% advantage within continents |
+| **04** | Deep Exploration | Non-linear region size effect; 2D patterns favor L=40 |
+
+---
+
+### Quantitative Results Summary
+
+#### Effective Resolution Limits
+
+| Model | 60% Accuracy Threshold | 70% Accuracy Threshold |
+|-------|------------------------|------------------------|
+| L=10 | 600-900km | 1000-1500km |
+| **L=40** | **300-450km** | **500-700km** |
+
+**L=40 achieves ~2x finer effective resolution than L=10.**
+
+#### L=40 Advantage by Scale (Global Checkerboard)
+
+| Scale | L=40 - L=10 | Interpretation |
+|-------|-------------|----------------|
+| <300km | ~0% | Both at random chance |
+| 300-450km | +1% to +5% | L=40 starting to resolve |
+| **450-800km** | **+8% to +16%** | **L=40's SWEET SPOT** |
+| 800-1000km | +0% to +8% | Transition zone |
+| >1000km | -5% to -20% | L=10 dominates |
+
+**Peak L=40 advantage: +16.2% at 675km globally**
+
+#### L=40 Advantage by Region (Within-Continent 500km Checkerboard)
+
+| Continent | L=40 Advantage | Scale |
+|-----------|----------------|-------|
+| South America | **+31%** | 600km |
+| Europe | **+30.9%** | 600km |
+| Oceania | **+28%** | 500km |
+| North America | **+25%** | 600km |
+| Asia | **+22%** | 600km |
+| Africa | **+18%** | 500km |
+
+**Key insight: L=40's advantage is dramatically larger within constrained regions!**
+
+#### Region Size Effect (Fixed 500km Cells)
+
+| Region Size | L=40 Advantage |
+|-------------|----------------|
+| 10° (1110km) | +4.3% |
+| 20° (2220km) | +5.2% |
+| **30° (3330km)** | **+30.9%** ← PEAK |
+| 50° (5550km) | +24.9% |
+| 75° (8325km) | +25.3% |
+| 100° (11100km) | +18.4% |
+| 180° (global) | +10.4% |
+
+**Surprising finding: L=40's advantage peaks at MEDIUM region sizes (~30°), not smallest!**
+
+#### Pattern Type Preference
+
+| Pattern | L=40 Advantage | Notes |
+|---------|----------------|-------|
+| **Checkerboard** | **+4.4%** | 2D discrimination required |
+| Diagonal stripes | +1.2% | Mixed 1D/2D |
+| Vertical stripes | -2.8% | 1D longitude |
+| Concentric rings | -4.4% | 1D radial |
+| **Horizontal stripes** | **-8.4%** | 1D latitude - L=10 excels |
+
+**L=40 excels at 2D spatial patterns; L=10 better at 1D (especially latitude bands).**
+
+#### Regression Performance (R²)
+
+| Task | L=10 | L=40 | Winner |
+|------|------|------|--------|
+| Air Temperature | 0.88 | 0.52 | **L=10** |
+| Elevation Proxy | 0.80 | **-0.37** | **L=10** |
+| Population Density | 0.70 | **-0.34** | **L=10** |
+| Spatial Interpolation | 0.97 | -0.16 | **L=10** |
+
+**L=40 gets NEGATIVE R² on regression tasks - embeddings too "spiky" for smooth predictions.**
+
+#### Embedding Discrimination Rate
+
+| Distance | L=10 Similarity | L=40 Similarity |
+|----------|-----------------|-----------------|
+| 100km | 0.997 | 0.966 |
+| 500km | 0.943 | 0.539 |
+| 1000km | 0.830 | 0.285 |
+| 2000km | 0.451 | 0.061 |
+
+- L=40 drops below 0.5 similarity at ~500km
+- L=10 drops below 0.5 similarity at ~2000km
+- **L=40 discriminates 4x faster** at medium distances
+
+---
+
+### Theoretical Insights
+
+#### Why L=40 Has Better Resolution But Worse Regression
+
+1. **Spherical harmonics frequency**: L=40 captures frequencies up to 40 cycles around the globe, L=10 only 10. This enables finer spatial discrimination.
+
+2. **Embedding "spikiness"**: L=40 embeddings change rapidly with small location changes. Great for distinguishing nearby locations, catastrophic for smooth regression (embeddings of training points don't generalize to nearby test points).
+
+3. **Generalization vs interpolation paradox**: Higher discrimination ≠ better downstream performance. L=40's rapid changes mean a linear/MLP regressor can't smoothly interpolate.
+
+#### Why Region Size Effect is Non-Linear
+
+1. **Too small (10°)**: Not enough diversity - both models easily solve the task
+2. **Sweet spot (30°)**: Enough diversity to challenge L=10, but L=40's local discrimination shines
+3. **Too large (180°)**: Global patterns overwhelm local structure - L=10's smooth embeddings win
+
+#### Why L=40 Prefers 2D Patterns
+
+1. **Spherical harmonics are 2D**: They encode variation in BOTH lat and lon
+2. **1D patterns (horizontal stripes)**: Effectively only latitude variation - spherical harmonics overkill
+3. **2D patterns (checkerboard)**: Require distinguishing both lat AND lon - L=40's extra frequencies help
+
+---
+
+### Practical Recommendations
+
+#### USE L=40 WHEN:
+- Working **within a ~3000km region** (continent, large country)
+- Task involves **400-800km scale spatial patterns**
+- Classification requires **2D spatial discrimination** (checkerboard-like)
+- You need to distinguish locations **300-600km apart**
+
+#### USE L=10 WHEN:
+- Any **regression task** (temperature, elevation, density)
+- **Global scale** analysis
+- **Coarse classification** (>1000km patterns)
+- **Boundary detection** (political/ecological borders)
+- **1D patterns** (latitude bands, horizontal stripes)
+- You need **smooth, generalizable embeddings**
+
+#### NEITHER MODEL IS SUITABLE WHEN:
+- Patterns are **finer than ~200-300km**
+- Task requires **city-level or finer resolution**
+- You need **street-level geolocation**
+
+---
+
+### Summary Statistics Across All Experiments
+
+| Metric | Value |
+|--------|-------|
+| Total experiments | 5 notebooks |
+| Total test configurations | 200+ |
+| Scales tested | 50km to 10,000km |
+| Patterns tested | 5 types |
+| Continents tested | 6 |
+| Region sizes tested | 10° to 180° |
+
+---
+
+### Open Questions for Future Work
+
+1. **Intermediate L values**: Would L=20 or L=30 provide a good compromise?
+2. **Image features**: Does L=40 perform better when combined with satellite image encoder?
+3. **Fine-tuning**: Can task-specific fine-tuning improve resolution?
+4. **Alternative encodings**: How do other location encoders (GeoCLIP, GPS2Vec) compare?
+5. **Why ~200-300km limit?**: Is this a fundamental SatCLIP training limit or spherical harmonic theory limit?
 
 ---
 
