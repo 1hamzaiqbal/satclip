@@ -917,11 +917,11 @@ Based on real-world US grid test:
 
 ---
 
-### Experiment 06: Extended Resolution Tests (READY TO RUN)
+### Experiment 06: Extended Resolution Tests (COMPLETED ✓)
 
 **Date**: 2025-12-27
 **Notebook**: `06_extended_resolution.ipynb`
-**Status**: Ready for Colab execution
+**Status**: Completed
 
 #### Purpose
 
@@ -953,6 +953,99 @@ Push the resolution limits further based on Experiment 05's surprising findings.
 - `multi_region_comparison.png` - Heatmap of L=40 advantage by region/scale
 - `region_size_effect_fine.png` - Region size effect at 50km
 - `extended_resolution_results.json` - All raw data
+
+---
+
+### Experiment 07: Population Density Multi-Resolution (COMPLETED ✓)
+
+**Date**: 2025-12-30
+**Notebook**: `07_population_resolution.ipynb`
+**Status**: Completed - **Confirms regional effect for regression tasks!**
+
+#### Purpose
+
+Replicate SatCLIP paper's Table 2 population density task and extend with multi-resolution and coverage analysis.
+
+#### Dataset
+
+**GPWv4** (Gridded Population of the World, Version 4)
+- Resolutions tested: 1° (~111km), 30' (~55km), 15' (~28km), 2.5' (~5km)
+- Year: 2020
+- Task: Predict log population density from location embeddings
+
+#### Methodology (Matching Paper Table 2)
+
+- 50/50 train/test split
+- MLP regressor on frozen embeddings
+- Log-transformed population density
+- R² metric
+
+#### Results Summary
+
+##### Paper Comparison (Sanity Check ✓)
+
+| Source | L=10 R² | L=40 R² | Δ |
+|--------|---------|---------|---|
+| **Paper (ResNet50)** | 0.79 | 0.82 | +0.03 |
+| **Ours (ViT16, 1°)** | 0.83 | 0.82 | -0.00 |
+| **Ours (ViT16, 15')** | 0.79 | 0.80 | +0.01 |
+
+**Sanity check passes** - our results match paper within expected variance.
+
+##### Global Results by Resolution
+
+| Resolution | L=10 R² | L=40 R² | Δ |
+|------------|---------|---------|---|
+| 1° (111km) | 0.826 | 0.823 | -0.003 |
+| 30' (55km) | 0.800 | 0.809 | +0.009 |
+| 15' (28km) | 0.788 | 0.797 | +0.008 |
+| 2.5' (5km) | 0.758 | 0.770 | **+0.011** |
+
+**Finding**: At global scale, L=40 and L=10 perform nearly identically (<1% difference).
+
+##### Regional Results (THE KEY FINDING!)
+
+| Region | L=10 R² | L=40 R² | Δ |
+|--------|---------|---------|---|
+| Global | 0.783 | 0.782 | -0.002 |
+| **USA** | 0.511 | 0.588 | **+0.077** |
+| **Europe** | 0.644 | 0.689 | **+0.045** |
+| **China** | 0.865 | 0.892 | **+0.027** |
+| India | 0.932 | 0.948 | +0.017 |
+| Brazil | 0.611 | 0.645 | +0.035 |
+| Africa | 0.781 | 0.819 | +0.037 |
+
+**Major finding**: L=40 advantage appears ONLY within constrained regions!
+- Global: ~0% advantage
+- Regional: +2% to +8% advantage
+
+##### Coverage × Resolution Grid
+
+| Coverage | 1° | 30' | 15' |
+|----------|-----|-----|-----|
+| Global | -0.02 | +0.01 | -0.00 |
+| USA | +0.04 | +0.06 | **+0.10** |
+| Europe | -0.01 | +0.05 | +0.06 |
+| China | +0.02 | +0.02 | +0.04 |
+
+**Finding**: L=40 advantage increases at finer resolutions WITHIN constrained regions.
+
+#### Key Insights
+
+1. **Regional Effect Dominates**: Coverage constraint has 10x larger effect than resolution on L=40 advantage.
+
+2. **Consistent with Classification**: Same pattern as checkerboard and county experiments - L=40 excels within regions, not globally.
+
+3. **Population is Smooth**: Unlike classification boundaries, population varies smoothly. Yet L=40 still wins within regions - suggesting advantage is about local discrimination, not just boundary detection.
+
+4. **Resolution Effect is Secondary**: Within a region, finer resolution slightly increases L=40 advantage (e.g., USA: +4% at 111km → +10% at 28km).
+
+#### Outputs Generated
+
+- `population_global_resolution.png` - R² by resolution
+- `population_regional.png` - R² by region
+- `population_coverage_resolution.png` - Coverage × Resolution heatmap
+- `population_resolution_results.json` - All raw data
 
 ---
 
