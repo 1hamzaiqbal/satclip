@@ -24,6 +24,22 @@ The **L parameter** (legendre_polys) controls the maximum degree of spherical ha
 - Higher L = more Legendre polynomials = finer frequency components = ability to represent smaller geographic features
 - Lower L = smoother, coarser representations = may blur fine-grained spatial patterns
 
+### Neural Network Architecture
+
+SatCLIP uses **SIREN** (Sinusoidal Representation Networks), NOT ReLU:
+```python
+class Sine(nn.Module):
+    def forward(self, x):
+        return torch.sin(self.w0 * x)  # Sine activation!
+```
+
+The location encoder is:
+```
+Spherical Harmonics (L² features) → SIREN (2 layers) → 256-dim embedding
+```
+
+The pretrained models use SIREN by default (`pe_type="siren"` in main.py). Switching to ReLU would require retraining from scratch since the learned weights are tuned for sine activations.
+
 ### Available Pretrained Models
 
 | Model | Vision Encoder | L | HuggingFace Path |
@@ -969,15 +985,22 @@ Replicate SatCLIP paper's Table 2 population density task and extend with multi-
 #### Dataset
 
 **GPWv4** (Gridded Population of the World, Version 4)
-- Resolutions tested: 1° (~111km), 30' (~55km), 15' (~28km), 2.5' (~5km)
+- **5 resolutions tested**: 1° (~111km), 30' (~55km), 15' (~28km), 2.5' (~5km), **30" (~1km)** ← NEW!
 - Year: 2020
 - Task: Predict log population density from location embeddings
+- 30 arc-sec file: 369.7 MB, 222 million valid cells
+
+#### Technical Notes
+
+- **SIREN activation**: SatCLIP location encoder uses SIREN (sine activations), NOT ReLU
+- Uses `rasterio` for large raster handling (30_sec is 933M pixels)
+- PIL limit disabled with `Image.MAX_IMAGE_PIXELS = None`
 
 #### Methodology (Matching Paper Table 2)
 
 - 50/50 train/test split
 - MLP regressor on frozen embeddings
-- Log-transformed population density
+- Log-transformed population density (log1p)
 - R² metric
 
 #### Results Summary
@@ -992,60 +1015,147 @@ Replicate SatCLIP paper's Table 2 population density task and extend with multi-
 
 **Sanity check passes** - our results match paper within expected variance.
 
-##### Global Results by Resolution
+##### Global Results by Resolution (ALL 5 RESOLUTIONS)
 
-| Resolution | L=10 R² | L=40 R² | Δ |
-|------------|---------|---------|---|
-| 1° (111km) | 0.826 | 0.823 | -0.003 |
-| 30' (55km) | 0.800 | 0.809 | +0.009 |
-| 15' (28km) | 0.788 | 0.797 | +0.008 |
-| 2.5' (5km) | 0.758 | 0.770 | **+0.011** |
+| Resolution | Scale | L=10 R² | L=40 R² | Δ | Winner |
+|------------|-------|---------|---------|---|--------|
+| 1° | 111km | 0.826 | 0.823 | -0.003 | ~Same |
+| 30' | 55km | 0.800 | 0.809 | +0.009 | ~Same |
+| 15' | 28km | 0.788 | 0.797 | +0.008 | ~Same |
+| 2.5' | 5km | 0.758 | 0.770 | +0.011 | L=40 |
+| **30"** | **1km** | **0.753** | **0.759** | **+0.005** | **~Same** |
 
-**Finding**: At global scale, L=40 and L=10 perform nearly identically (<1% difference).
+**Average L=40 advantage (global): +0.006** (<1%)
+
+**Finding**: At global scale, L=40 and L=10 perform nearly identically at ALL resolutions, including the finest 1km resolution.
 
 ##### Regional Results (THE KEY FINDING!)
 
-| Region | L=10 R² | L=40 R² | Δ |
-|--------|---------|---------|---|
-| Global | 0.783 | 0.782 | -0.002 |
-| **USA** | 0.511 | 0.588 | **+0.077** |
-| **Europe** | 0.644 | 0.689 | **+0.045** |
-| **China** | 0.865 | 0.892 | **+0.027** |
-| India | 0.932 | 0.948 | +0.017 |
-| Brazil | 0.611 | 0.645 | +0.035 |
-| Africa | 0.781 | 0.819 | +0.037 |
+| Region | Samples | L=10 R² | L=40 R² | Δ | Winner |
+|--------|---------|---------|---------|---|--------|
+| Global | 10,000 | 0.783 | 0.782 | -0.002 | ~Same |
+| **USA** | 10,000 | 0.511 | 0.588 | **+0.077** | **L=40** |
+| **Europe** | 10,000 | 0.644 | 0.689 | **+0.045** | **L=40** |
+| **Africa** | 10,000 | 0.781 | 0.819 | **+0.037** | **L=40** |
+| **Brazil** | 10,000 | 0.611 | 0.645 | **+0.035** | **L=40** |
+| **China** | 10,000 | 0.864 | 0.892 | **+0.028** | **L=40** |
+| India | 9,271 | 0.932 | 0.948 | +0.017 | ~Same |
+
+**Average L=40 advantage (regional, excluding global): +0.040** (+4%)
 
 **Major finding**: L=40 advantage appears ONLY within constrained regions!
 - Global: ~0% advantage
 - Regional: +2% to +8% advantage
 
-##### Coverage × Resolution Grid
+##### Coverage × Resolution Grid (COMPREHENSIVE)
 
-| Coverage | 1° | 30' | 15' |
-|----------|-----|-----|-----|
-| Global | -0.02 | +0.01 | -0.00 |
-| USA | +0.04 | +0.06 | **+0.10** |
-| Europe | -0.01 | +0.05 | +0.06 |
-| China | +0.02 | +0.02 | +0.04 |
+Tested all 5 resolutions × 7 coverage sizes (centered on Europe):
 
-**Finding**: L=40 advantage increases at finer resolutions WITHIN constrained regions.
+**L=40 Peak Advantages by Resolution:**
+| Resolution | Peak Advantage | Coverage Size |
+|------------|----------------|---------------|
+| 1° (111km) | +0.068 | Continent (~5000km) |
+| 30' (55km) | +0.106* | Large Country (~2000km) |
+| 15' (28km) | +0.103 | Large Country (~2000km) |
+| 2.5' (5km) | +0.108 | Continent (~5000km) |
+| **30" (1km)** | **+0.078** | **Large Country (~2000km)** |
+
+*Note: 30' at Country size had outlier (+5.5) due to only 200 samples - filtered out.
+
+**Key pattern**: L=40 advantage peaks at intermediate coverage sizes (2000-5000km), NOT at smallest or largest.
+
+##### Geographic Centers Test (NEW!)
+
+Tested coverage effect at 6 different geographic centers:
+
+| Center | Country (~1000km) | Half-Cont (~3000km) | Continent (~5000km) | Global |
+|--------|-------------------|---------------------|---------------------|--------|
+| Europe | +0.030 | +0.097 | +0.087 | +0.002 |
+| East USA | -0.012 | +0.082 | +0.052 | +0.002 |
+| China | +0.022 | +0.020 | +0.027 | +0.002 |
+| India | +0.123 | +0.035 | +0.037 | +0.002 |
+| Brazil | +0.004 | +0.036 | +0.055 | +0.002 |
+| Australia | -0.401* | +0.025 | +0.095 | +0.002 |
+
+*Australia at Country size had poor results due to sparse population in central Australia.
+
+**Average L=40 advantage by coverage (across all centers):**
+- Country (~1000km): -0.039 ± 0.184 (high variance, some outliers)
+- Half-Continent (~3000km): **+0.049** ± 0.032
+- Continent (~5000km): **+0.059** ± 0.027
+- Global: +0.002 ± 0.000
 
 #### Key Insights
 
-1. **Regional Effect Dominates**: Coverage constraint has 10x larger effect than resolution on L=40 advantage.
+1. **Regional Effect Dominates**: Coverage constraint has **10x larger effect** than resolution on L=40 advantage.
 
-2. **Consistent with Classification**: Same pattern as checkerboard and county experiments - L=40 excels within regions, not globally.
+2. **Resolution is Secondary**: Tested from 111km to 1km - L=40 advantage doesn't change significantly with resolution at global scale. All five resolutions show <1% difference.
 
-3. **Population is Smooth**: Unlike classification boundaries, population varies smoothly. Yet L=40 still wins within regions - suggesting advantage is about local discrimination, not just boundary detection.
+3. **Consistent with Classification**: Same pattern as checkerboard and county experiments - L=40 excels within regions, not globally.
 
-4. **Resolution Effect is Secondary**: Within a region, finer resolution slightly increases L=40 advantage (e.g., USA: +4% at 111km → +10% at 28km).
+4. **Population is Smooth**: Unlike classification boundaries, population varies smoothly. Yet L=40 still wins within regions - suggesting advantage is about **local discrimination**, not just boundary detection.
+
+5. **30 arc-second (1km) Works**: Successfully loaded and tested the highest-resolution GPW data (222M cells, 369.7 MB). Results consistent with coarser resolutions.
+
+6. **Geographic centers confirm pattern**: Tested 6 different centers across the globe - all show same pattern of regional advantage, global parity.
 
 #### Outputs Generated
 
-- `population_global_resolution.png` - R² by resolution
+- `population_global_resolution.png` - R² by resolution (5 resolutions)
 - `population_regional.png` - R² by region
-- `population_coverage_resolution.png` - Coverage × Resolution heatmap
-- `population_resolution_results.json` - All raw data
+- `population_coverage_resolution.png` - Coverage × Resolution heatmap (4-panel)
+- `population_resolution_results.json` - All raw data (5 + 7 + 33 + 24 = 69 test configurations)
+
+---
+
+### Experiment 08: Extended Analysis (READY TO RUN)
+
+**Date**: 2025-12-30
+**Notebook**: `08_extended_analysis.ipynb`
+**Status**: Ready for Colab execution
+
+#### Purpose
+
+Fill remaining gaps in the investigation with four key tests:
+
+1. **Temperature at Regional Scale**: Does L=40 win temperature regionally like it does for population?
+2. **Raw Spherical Harmonics vs SIREN**: What if we bypass SIREN and use raw SH features directly?
+3. **Sub-Regional Tests**: Checkerboard within US states and EU countries (smaller regions)
+4. **Cross-Region Transfer**: Train on one continent, test on another (both regression and classification)
+
+#### Tests Included
+
+**Temperature Regional (7 regions):**
+- Global, North America, Europe, East Asia, South America, Africa, Australia
+- Matches methodology from population experiment
+
+**Raw SH Features:**
+- Compare: SIREN L=10, SIREN L=40, Raw SH L=10, Raw SH L=40
+- Test both global and regional (Europe)
+- Answers: Does SIREN help or hurt L=40?
+
+**Sub-Regional Checkerboard (9 regions × 4 cell sizes):**
+- US: California, Texas, Florida, New York
+- EU: Germany, France, Spain, Italy, UK
+- Cell sizes: 0.5°, 1°, 2°, 3° (~55-333km)
+
+**Cross-Region Transfer (13 temperature pairs + 6 checkerboard pairs):**
+- Temperature: Europe ↔ North America ↔ East Asia ↔ South America ↔ Africa ↔ Australia
+- Checkerboard: 6 pairs with 2° cells (~222km)
+- Key question: Does L=40's regional advantage transfer to new regions?
+
+#### Expected Outputs
+
+- `raw_sh_vs_siren.png` - Comparison of raw features vs SIREN
+- `cross_region_transfer.png` - Transfer results visualization
+- `extended_analysis_results.json` - All raw data
+
+#### Key Questions Answered
+
+1. Is L=40's regional advantage task-specific (population only) or general?
+2. Does SIREN help L=40, or are raw SH features sufficient?
+3. Does L=40 advantage hold at sub-regional (state/country) scale?
+4. Can models trained on one region predict well on other regions?
 
 ---
 
@@ -1106,6 +1216,8 @@ This investigation comprehensively characterized the **effective spatial resolut
 | **03** | Comprehensive Sweep | L=40 has +25-31% advantage within continents |
 | **04** | Deep Exploration | Non-linear region size effect; 2D patterns favor L=40 |
 | **05** | Real-World Tests | **L=40 wins at ALL scales 50-400km on real US geography!** |
+| **06** | Extended Resolution | Push resolution limits further with ultra-fine grids |
+| **07** | Population Multi-Res | **Regional constraint matters more than data resolution!** |
 
 ---
 
@@ -1184,10 +1296,11 @@ This investigation comprehensively characterized the **effective spatial resolut
 |------|------|------|--------|
 | Air Temperature | 0.88 | 0.52 | **L=10** |
 | Elevation Proxy | 0.80 | **-0.37** | **L=10** |
-| Population Density | 0.70 | **-0.34** | **L=10** |
+| Population (Global) | 0.78 | 0.78 | ~Same |
+| Population (Regional) | 0.70 | 0.76 | **L=40** (+4% avg) |
 | Spatial Interpolation | 0.97 | -0.16 | **L=10** |
 
-**L=40 gets NEGATIVE R² on regression tasks - embeddings too "spiky" for smooth predictions.**
+**Population density is different**: At global scale, L=10 ≈ L=40. But within regions (USA, Europe, etc.), L=40 wins by +2% to +8%! This suggests population prediction benefits from L=40's local discrimination when geographically constrained.
 
 #### Embedding Discrimination Rate
 
@@ -1257,13 +1370,14 @@ This investigation comprehensively characterized the **effective spatial resolut
 
 | Metric | Value |
 |--------|-------|
-| Total experiments | 6 notebooks |
-| Total test configurations | 250+ |
+| Total experiments | **7 notebooks** |
+| Total test configurations | **300+** |
 | Scales tested | 50km to 10,000km |
-| Patterns tested | 5 synthetic + 4 real-world |
+| Data resolutions tested | 1km (30") to 111km (1°) |
+| Patterns tested | 5 synthetic + 5 real-world |
 | Continents tested | 6 |
 | Region sizes tested | 10° to 180° |
-| Real-world tasks | US counties, US grid, EU countries, cities, pop density |
+| Real-world tasks | US counties, US grid, EU countries, cities, **pop density (5 resolutions)** |
 
 ---
 
