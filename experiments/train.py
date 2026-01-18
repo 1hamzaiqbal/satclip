@@ -106,7 +106,7 @@ def get_datamodule(config: Config) -> pl.LightningDataModule:
 
     elif dataset in ["elevation", "population"]:
         return GeographicDataModule(
-            task=dataset,
+            dataset_task=dataset,
             n_samples=data_config.get("n_samples", 10000),
             region=data_config.get("region", None),
             test_fraction=data_config.get("test_fraction", 0.3),

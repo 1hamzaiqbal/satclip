@@ -294,7 +294,7 @@ class GeographicDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        task: Literal["elevation", "population"] = "elevation",
+        dataset_task: Literal["elevation", "population"] = "elevation",
         n_samples: int = 10000,
         region: Optional[Tuple[float, float, float, float]] = None,
         test_fraction: float = 0.3,
@@ -306,7 +306,7 @@ class GeographicDataModule(pl.LightningDataModule):
         """Initialize datamodule.
 
         Args:
-            task: Task type ("elevation" or "population")
+            dataset_task: Dataset task type ("elevation" or "population")
             n_samples: Total number of samples
             region: Optional bounding box
             test_fraction: Fraction of data for testing
@@ -316,7 +316,7 @@ class GeographicDataModule(pl.LightningDataModule):
             data_path: Path to data file
         """
         super().__init__()
-        self.task = task
+        self.dataset_task = dataset_task
         self.n_samples = n_samples
         self.region = region
         self.test_fraction = test_fraction
@@ -329,14 +329,14 @@ class GeographicDataModule(pl.LightningDataModule):
 
     def setup(self, stage: Optional[str] = None):
         """Set up datasets."""
-        if self.task == "elevation":
+        if self.dataset_task == "elevation":
             full_dataset = ElevationDataset(
                 n_samples=self.n_samples,
                 region=self.region,
                 seed=self.seed,
                 data_path=self.data_path,
             )
-        elif self.task == "population":
+        elif self.dataset_task == "population":
             full_dataset = PopulationDataset(
                 n_samples=self.n_samples,
                 region=self.region,
@@ -344,7 +344,7 @@ class GeographicDataModule(pl.LightningDataModule):
                 data_path=self.data_path,
             )
         else:
-            raise ValueError(f"Unknown task: {self.task}")
+            raise ValueError(f"Unknown dataset_task: {self.dataset_task}")
 
         # Store normalization parameters
         self.target_mean = full_dataset.mean
