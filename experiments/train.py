@@ -47,7 +47,7 @@ from experiments.utils.config import (
     parse_cli_overrides,
     Config,
 )
-from experiments.models.lightning_module import LearnedActivationsModule
+from experiments.models.lightning_module import LearnedActivationsModule, ContrastiveLearningModule
 from experiments.data import (
     GeographicDataModule,
     SyntheticDataModule,
@@ -140,7 +140,39 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
     """
     model_config = config.model
     training_config = config.training
+    task = config.data.get("task", "regression")
 
+    # Check if this is a contrastive learning task
+    if task == "contrastive":
+        return ContrastiveLearningModule(
+            # Vision encoder
+            vision_encoder=model_config.get("vision_encoder", "moco_resnet18"),
+            embed_dim=model_config.get("embed_dim", 256),
+            freeze_vision=model_config.get("freeze_vision", True),
+            # Location encoder - encoding
+            encoding_type=model_config.encoding.get("type", "spherical_harmonics"),
+            encoding_config={
+                k: v for k, v in model_config.encoding.to_dict().items() if k != "type"
+            },
+            # Location encoder - network
+            hidden_dim=model_config.network.get("hidden_dim", 256),
+            num_layers=model_config.network.get("num_layers", 2),
+            # Location encoder - activation
+            activation_type=model_config.activation.get("type", "siren"),
+            activation_config={
+                k: v for k, v in model_config.activation.to_dict().items() if k != "type"
+            },
+            # Training
+            learning_rate=training_config.get("learning_rate", 1e-4),
+            weight_decay=training_config.get("weight_decay", 0.01),
+            temperature=model_config.get("temperature", 0.07),
+            # Scheduler
+            scheduler=training_config.get("scheduler", None),
+            warmup_epochs=training_config.get("warmup_epochs", 10),
+            min_lr=training_config.get("min_lr", 1e-6),
+        )
+
+    # Standard regression/classification task
     # Get target statistics if available
     target_mean = 0.0
     target_std = 1.0
@@ -163,7 +195,7 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
             k: v for k, v in model_config.activation.to_dict().items() if k != "type"
         },
         # Task
-        task=config.data.get("task", "regression"),
+        task=task,
         num_classes=config.data.get("num_classes", 1),
         # Training
         learning_rate=training_config.get("learning_rate", 0.001),

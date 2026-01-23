@@ -1,49 +1,132 @@
-# SatCLIP-style contrastive learning experiment
-# Trains location encoder with image encoder
+# SatCLIP-style Contrastive Learning Configuration
+# ================================================
+# Trains a location encoder that aligns with satellite image embeddings
+# using a contrastive loss (CLIP-style).
+#
+# This config supports custom learned activation functions in place of
+# the original SIREN + Spherical Harmonics setup.
+#
+# Usage:
+#   # Default (SIREN + SH, like original SatCLIP):
+#   python -m experiments.train --config experiments/configs/experiments/contrastive.yaml
+#
+#   # With splines instead of SIREN:
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive.yaml \
+#     --config experiments/configs/activations/spline.yaml
+#
+#   # With RFF encoding instead of SH (use with ReLU, NOT with RFF activation!):
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive.yaml \
+#     --config experiments/configs/encodings/rff_encoding.yaml \
+#     --config experiments/configs/activations/relu.yaml
+#
+#   # Quick test run:
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive.yaml \
+#     --trainer.fast_dev_run=true
 
 experiment:
-  name: "contrastive"
-  description: "Contrastive learning with satellite imagery"
+  name: "contrastive_satclip"
+  description: "Contrastive learning with satellite imagery and custom activations"
 
 model:
-  # Vision encoder
-  vision_encoder: "moco_resnet18"  # moco_resnet18, moco_resnet50, moco_vit16
-  embed_dim: 256
+  # Vision Encoder Configuration
+  # ----------------------------
+  # Options: moco_resnet18, moco_resnet50, moco_vit16
+  # These are pretrained on Sentinel-2 imagery with MoCo self-supervised learning
+  # The vision encoder is frozen except for the final projection layer
+  vision_encoder: "moco_resnet18"
+  embed_dim: 256  # Output embedding dimension (must match between vision and location)
+  freeze_vision: true  # Freeze pretrained weights (recommended)
 
-  # Location encoder
+  # Location Encoder: Positional Encoding
+  # -------------------------------------
+  # Transforms (lon, lat) coordinates into features before the neural network
   encoding:
-    type: "spherical_harmonics"
-    legendre_polys: 32
+    type: "spherical_harmonics"  # Options: spherical_harmonics, sh, raw, rff, cartesian3d
+    legendre_polys: 10  # For SH: controls resolution (10=100 dims, 20=400, 40=1600)
+    harmonics_calculation: "analytic"  # analytic is faster, closed-form is more general
 
+  # Location Encoder: Neural Network
+  # ---------------------------------
   network:
-    hidden_dim: 256
-    output_dim: 256
-    num_layers: 2
+    hidden_dim: 256  # Hidden layer width
+    output_dim: 256  # Must match embed_dim
+    num_layers: 2    # Number of hidden layers (paper uses 2)
 
+  # Location Encoder: Activation Function
+  # -------------------------------------
+  # This is where you can experiment with different learned activations!
   activation:
-    type: "siren"
-    w0: 1.0
-    w0_initial: 30.0
+    type: "siren"  # Options: siren, relu, spline, rff
+    # SIREN-specific (only used when type=siren)
+    w0: 1.0           # Frequency for hidden layers
+    w0_initial: 30.0  # Frequency for first layer (higher = capture more detail)
+    # Spline-specific (only used when type=spline)
+    # n_knots: 15
+    # input_range: [-3.0, 3.0]
+    # init: "relu"
+    # RFF-specific (only used when type=rff) - WARNING: avoid with SH encoding!
+    # n_features: 256
+    # sigma: 10.0
 
-  # Contrastive learning
-  temperature: 0.07
+  # Contrastive Learning Parameters
+  temperature: 0.07  # Lower = sharper distribution (paper uses 0.07)
 
+# Data Configuration
+# ------------------
 data:
-  task: "contrastive"
-  dataset: "satclip"  # Uses HuggingFace dataset
-  batch_size: 512
-  num_workers: 8
-  val_split: 0.1
+  task: "contrastive"  # Triggers contrastive learning mode
+  dataset: "satclip"   # Uses HuggingFace dataset: davanstrien/satclip (S2-100K)
 
+  batch_size: 512      # Paper uses 8k effective batch size via accumulation
+  num_workers: 8
+  val_split: 0.1       # 10% for validation
+
+  # Optional: specify cache directory for downloaded data
+  cache_dir: null  # e.g., "/scratch/data/satclip"
+
+# Training Configuration
+# ----------------------
 training:
   max_epochs: 500
-  learning_rate: 0.0001
+  learning_rate: 0.0001  # 1e-4 works well
   weight_decay: 0.01
 
-  # Gradient accumulation for effective larger batch
+  # Gradient accumulation for larger effective batch size
+  # effective_batch = batch_size * accumulate_grad_batches
+  # Paper uses ~8k, so 512 * 16 = 8192
   accumulate_grad_batches: 16
 
+  # Learning rate scheduler (optional)
+  scheduler: "warmup_cosine"  # Options: null, cosine, warmup_cosine
+  warmup_epochs: 10
+  min_lr: 0.000001  # 1e-6
+
+  # Early stopping (optional)
+  early_stopping:
+    enabled: false
+    patience: 50
+    monitor: "val_loss"
+    mode: "min"
+
+# Logging Configuration
+# ---------------------
 logging:
+  logger: "tensorboard"
+  save_dir: "./logs"
+  name: "contrastive"
+
   checkpoint:
     save_top_k: 3
     monitor: "val_loss"
+    mode: "min"
+    save_last: true
+
+# Hardware Configuration
+# ----------------------
+hardware:
+  accelerator: "auto"  # auto, cpu, gpu, mps
+  devices: 1           # Number of GPUs
+  precision: 32        # 32, 16, bf16 (16/bf16 for faster training on modern GPUs)

@@ -112,9 +112,80 @@ python -m experiments.train --config experiments/configs/experiments/continent.y
 python -m experiments.train --config experiments/configs/experiments/resolution.yaml
 ```
 
-### 6. Contrastive Learning (SatCLIP-style)
+### 6. Contrastive Learning (SatCLIP-style with Custom Activations)
+
+Train your own SatCLIP with custom learned activation functions:
+
 ```bash
+# Default (SIREN + SH, like original paper)
 python -m experiments.train --config experiments/configs/experiments/contrastive.yaml
+
+# With splines instead of SIREN
+python -m experiments.train \
+    --config experiments/configs/experiments/contrastive.yaml \
+    --config experiments/configs/activations/spline.yaml
+
+# With ReLU (often better than SIREN!)
+python -m experiments.train \
+    --config experiments/configs/experiments/contrastive.yaml \
+    --config experiments/configs/activations/relu.yaml
+
+# With ViT vision encoder (better quality, slower)
+python -m experiments.train \
+    --config experiments/configs/experiments/contrastive.yaml \
+    --model.vision_encoder=moco_vit16
+
+# Quick test (2 epochs, small batch)
+python -m experiments.train \
+    --config experiments/configs/experiments/contrastive.yaml \
+    --training.max_epochs=2 \
+    --data.batch_size=32 \
+    --training.accumulate_grad_batches=1
+```
+
+**SLURM submission for contrastive training:**
+```bash
+# Default
+sbatch experiments/scripts/slurm/submit_contrastive.sh
+
+# With spline
+sbatch experiments/scripts/slurm/submit_contrastive.sh --activation spline
+
+# Quick test
+sbatch experiments/scripts/slurm/submit_contrastive.sh --test
+```
+
+## Data Requirements
+
+### For Regression/Classification Tasks
+
+- **Elevation**: Uses ETOPO data (`etopo_60s.nc`) - included or auto-generated
+- **Population**: Uses GPW population density data (specify `--data.data_path`)
+- **Synthetic**: Generated on-the-fly (checkerboard, Gaussian mixture)
+
+### For Contrastive Learning (SatCLIP)
+
+Uses the **S2-100K dataset** from HuggingFace:
+- Dataset: `davanstrien/satclip`
+- Size: ~100,000 Sentinel-2 satellite image tiles (256x256, 12 channels)
+- Storage: ~50GB when cached locally
+- Auto-downloaded on first use
+
+**Pre-download for HPC:**
+```python
+from datasets import load_dataset
+dataset = load_dataset("davanstrien/satclip", cache_dir="/scratch/$USER/satclip_data")
+```
+
+**Set cache directory (recommended for HPC):**
+```bash
+export HF_HOME=/scratch/$USER/hf_cache
+# Or in config: data.cache_dir: "/scratch/$USER/satclip_data"
+```
+
+**Required packages for contrastive:**
+```bash
+pip install datasets torchgeo timm
 ```
 
 ## Key Findings from Hamza Notebooks
