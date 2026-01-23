@@ -73,6 +73,21 @@ def test_imports():
         print(f"  Data: FAILED - {e}")
         return False
 
+    # New: test HF datamodule and coord_utils imports
+    try:
+        from experiments.data import (
+            HFMultispectralDataModule,
+            HFSatelliteDataset,
+            latlon_to_sphere,
+            sphere_to_latlon,
+            coordinate_jitter,
+            load_sites,
+        )
+        print("  HF Datamodule & Coord Utils: OK")
+    except ImportError as e:
+        print(f"  HF Datamodule & Coord Utils: FAILED - {e}")
+        return False
+
     return True
 
 
@@ -178,6 +193,92 @@ def test_lightning_module():
     return True
 
 
+def test_coord_utils():
+    """Test coordinate utility functions."""
+    print("\nTesting coordinate utilities...")
+    import torch
+    from experiments.data import latlon_to_sphere, sphere_to_latlon, coordinate_jitter
+
+    try:
+        # Test lat/lon to sphere conversion
+        coords = torch.tensor([[37.7749, -122.4194], [40.7128, -74.0060]])  # SF, NYC
+        xyz = latlon_to_sphere(coords)
+        assert xyz.shape == (2, 3), f"Expected shape (2, 3), got {xyz.shape}"
+
+        # Verify unit sphere (norm should be ~1)
+        norms = torch.norm(xyz, dim=-1)
+        assert torch.allclose(norms, torch.ones(2), atol=1e-5), "Points not on unit sphere"
+        print("  latlon_to_sphere: OK")
+
+        # Test sphere to lat/lon conversion (round trip)
+        coords_back = sphere_to_latlon(xyz)
+        assert torch.allclose(coords, coords_back, atol=1e-4), "Round trip failed"
+        print("  sphere_to_latlon: OK")
+
+        # Test coordinate jitter
+        jittered = coordinate_jitter(coords, radius=0.01)
+        assert jittered.shape == coords.shape, "Jitter changed shape"
+        assert not torch.allclose(jittered, coords), "Jitter didn't change coordinates"
+        print("  coordinate_jitter: OK")
+
+        return True
+
+    except Exception as e:
+        print(f"  Coordinate utilities: FAILED - {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
+def test_eval_range():
+    """Test RANGE evaluation framework."""
+    print("\nTesting RANGE evaluation framework...")
+
+    try:
+        from experiments.eval_range import (
+            CheckerboardDataset,
+            extract_embeddings,
+            evaluate_embeddings,
+            get_dataset,
+        )
+        print("  eval_range imports: OK")
+
+        # Test checkerboard dataset (synthetic, no files needed)
+        checker = CheckerboardDataset(n_samples=100, n_classes=4, n_support=50)
+        assert len(checker.train_ds) == 100, "Wrong train size"
+        print("  CheckerboardDataset: OK")
+
+        # Test extraction with a simple encoder
+        import torch
+        import torch.nn as nn
+        from torch.utils.data import DataLoader, TensorDataset
+
+        class DummyEncoder(nn.Module):
+            def __init__(self, output_dim=64):
+                super().__init__()
+                self.fc = nn.Linear(2, output_dim)
+
+            def forward(self, x):
+                return self.fc(x.float())
+
+        encoder = DummyEncoder()
+        coords = torch.randn(50, 2)
+        labels = torch.randint(0, 4, (50,))
+        loader = DataLoader(TensorDataset(coords, labels), batch_size=16)
+
+        embeddings, labels_out = extract_embeddings(loader, encoder, device="cpu")
+        assert embeddings.shape == (50, 64), f"Expected (50, 64), got {embeddings.shape}"
+        print("  extract_embeddings: OK")
+
+        return True
+
+    except Exception as e:
+        print(f"  RANGE evaluation: FAILED - {e}")
+        import traceback
+        traceback.print_exc()
+        return False
+
+
 def test_full_training_loop():
     """Test a minimal training loop."""
     print("\nTesting full training loop (1 epoch, 10 samples)...")
@@ -235,12 +336,25 @@ def main():
     all_passed &= test_encodings()
     all_passed &= test_location_encoder()
     all_passed &= test_synthetic_data()
+    all_passed &= test_coord_utils()
+    all_passed &= test_eval_range()
     all_passed &= test_lightning_module()
     all_passed &= test_full_training_loop()
 
     print("\n" + "=" * 60)
     if all_passed:
         print("All tests PASSED! Ready to submit HPC jobs.")
+        print("\nNext steps:")
+        print("  1. Submit preprocessing job to HPC:")
+        print("     sbatch experiments/scripts/slurm/preprocess_s2k.sh")
+        print("")
+        print("  2. Once preprocessing is done, run training:")
+        print("     sbatch experiments/scripts/slurm/submit_contrastive.sh")
+        print("     # Or for multispectral:")
+        print("     python -m experiments.train --config experiments/configs/experiments/contrastive_multispectral.yaml")
+        print("")
+        print("  3. Evaluate trained model:")
+        print("     sbatch experiments/scripts/slurm/eval_range.sh --model_path /path/to/checkpoint.pt")
     else:
         print("Some tests FAILED. Fix issues before submitting jobs.")
     print("=" * 60)

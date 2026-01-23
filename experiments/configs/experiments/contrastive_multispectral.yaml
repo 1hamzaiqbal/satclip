@@ -1,0 +1,125 @@
+# SatCLIP-style Contrastive Learning with Multispectral Sentinel-2 Imagery
+# =========================================================================
+#
+# This config uses the HuggingFace Arrow-based preprocessed dataset for
+# MUCH faster training (2-3x speedup vs loading individual TIF files).
+#
+# PREREQUISITES:
+# 1. Run the preprocessing pipeline to create the HF dataset:
+#    sbatch experiments/scripts/slurm/preprocess_s2k.sh
+#
+# 2. Update hf_dataset_path below to point to the preprocessed dataset
+#
+# Usage:
+#   # Default configuration
+#   python -m experiments.train --config experiments/configs/experiments/contrastive_multispectral.yaml
+#
+#   # With different activation function
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive_multispectral.yaml \
+#     --config experiments/configs/activations/relu.yaml
+#
+#   # With custom dataset path
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive_multispectral.yaml \
+#     --data.hf_dataset_path=/path/to/your/preprocessed/dataset
+
+experiment:
+  name: "contrastive_multispectral"
+  description: "Contrastive learning with 13-band Sentinel-2 imagery and custom activations"
+
+model:
+  # Vision Encoder Configuration
+  # ----------------------------
+  # Options for multispectral (13-channel) imagery:
+  #   mae_vit_large16: MAE pretrained ViT-L/16 (SSL4EO-S12, RECOMMENDED)
+  #   moco_vit16: MoCo pretrained ViT-Small-16 (torchgeo)
+  #   dino_vit16: DINO pretrained ViT-Small-16 (torchgeo)
+  #   moco_resnet50: MoCo pretrained ResNet50 (torchgeo)
+  vision_encoder: "moco_resnet50"  # Using torchgeo's MoCo ResNet50 for 13-band input
+  embed_dim: 512  # Match TTE default
+  freeze_vision: true  # Freeze backbone, only train projection
+
+  # Location Encoder: Positional Encoding
+  encoding:
+    type: "spherical_harmonics"
+    legendre_polys: 10  # 100 dimensions
+    harmonics_calculation: "analytic"
+
+  # Location Encoder: Neural Network
+  network:
+    hidden_dim: 512
+    output_dim: 512  # Must match embed_dim
+    num_layers: 2
+
+  # Location Encoder: Activation Function
+  activation:
+    type: "siren"
+    w0: 1.0
+    w0_initial: 30.0
+
+  # Contrastive temperature
+  temperature: 0.07
+
+# Data Configuration
+# ------------------
+data:
+  task: "contrastive"
+  dataset: "satclip_multispectral"  # Triggers HFMultispectralDataModule
+
+  # HuggingFace Arrow dataset settings
+  use_hf_dataset: true
+  hf_dataset_path: "/projects/bdbk/cherd/data/satclip_manual/satclip_hf_preprocessed"
+
+  # Image settings
+  crop_size: 224  # Match SSL4EO-S12 pretrained model
+  pad_to_13_channels: false  # Already padded in preprocessed dataset
+  preprocessed: true  # Data is already normalized
+
+  # DataLoader settings
+  batch_size: 512
+  num_workers: 8
+  val_split: 0.1
+
+# Training Configuration
+# ----------------------
+training:
+  max_epochs: 500
+  learning_rate: 0.0001
+  weight_decay: 0.01
+
+  # Gradient accumulation for larger effective batch size
+  accumulate_grad_batches: 4  # effective batch = 512 * 4 = 2048
+
+  # Learning rate scheduler
+  scheduler: "warmup_cosine"
+  warmup_epochs: 10
+  min_lr: 0.000001
+
+  # Gradient clipping for stability
+  gradient_clip_val: 1.0
+
+  early_stopping:
+    enabled: false
+    patience: 50
+    monitor: "val_loss"
+
+# Logging Configuration
+# ---------------------
+logging:
+  logger: "tensorboard"
+  save_dir: "./logs"
+  name: "contrastive_multispectral"
+
+  checkpoint:
+    save_top_k: 3
+    monitor: "val_loss"
+    mode: "min"
+    save_last: true
+
+# Hardware Configuration
+# ----------------------
+hardware:
+  accelerator: "auto"
+  devices: 1
+  precision: 16  # Use mixed precision for faster training

@@ -52,6 +52,7 @@ from experiments.data import (
     GeographicDataModule,
     SyntheticDataModule,
     SatCLIPHuggingFaceDataModule,
+    HFMultispectralDataModule,
 )
 
 
@@ -122,6 +123,19 @@ def get_datamodule(config: Config) -> pl.LightningDataModule:
             num_workers=data_config.get("num_workers", 8),
             val_split=data_config.get("val_split", 0.1),
             cache_dir=data_config.get("cache_dir", None),
+        )
+
+    elif dataset == "satclip_multispectral" or data_config.get("use_hf_dataset", False):
+        # HuggingFace Arrow-based multispectral dataset (fast, preprocessed)
+        return HFMultispectralDataModule(
+            dataset_path=data_config.get("hf_dataset_path"),
+            batch_size=data_config.get("batch_size", 256),
+            num_workers=data_config.get("num_workers", 8),
+            crop_size=data_config.get("crop_size", 224),
+            val_split=data_config.get("val_split", 0.1),
+            pad_to_13_channels=data_config.get("pad_to_13_channels", True),
+            preprocessed=data_config.get("preprocessed", False),
+            seed=config.experiment.get("seed", 42),
         )
 
     else:
