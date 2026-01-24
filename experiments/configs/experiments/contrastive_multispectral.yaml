@@ -69,7 +69,7 @@ data:
 
   # HuggingFace Arrow dataset settings
   use_hf_dataset: true
-  hf_dataset_path: "/engrfs/project/jacobsn/hiqbal/data_processed/satclip/satclip_hf_preprocessed"
+  hf_dataset_path: "/engrfs/tmp/jacobsn/hiqbal_satclip/satclip_hf_preprocessed"
 
   # Image settings
   crop_size: 224  # Match SSL4EO-S12 pretrained model
@@ -108,14 +108,18 @@ training:
 # ---------------------
 logging:
   logger: "tensorboard"
-  save_dir: "./logs"
+  save_dir: "/engrfs/project/jacobsn/hiqbal/logs/satclip"
   name: "contrastive_multispectral"
+
+  # Frequent logging for monitoring
+  log_every_n_steps: 50  # Log metrics every 50 steps
 
   checkpoint:
     save_top_k: 3
     monitor: "val_loss"
     mode: "min"
     save_last: true
+    every_n_epochs: 10  # Also save every 10 epochs for safety
 
 # Hardware Configuration
 # ----------------------

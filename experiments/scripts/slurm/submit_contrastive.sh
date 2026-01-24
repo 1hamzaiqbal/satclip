@@ -73,8 +73,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
-# Create logs directory
-mkdir -p logs
+# Create logs directory on project storage
+LOGS_DIR=/engrfs/project/jacobsn/hiqbal/logs/satclip_contrastive
+mkdir -p $LOGS_DIR
+mkdir -p logs  # Also keep local logs symlinked
 
 # Print job info
 echo "=============================================="
@@ -96,14 +98,20 @@ echo "=============================================="
 # Environment Setup
 # =============================================================================
 
-# Conda environment
-if [ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]; then
+# Conda environment (WashU RIS HPC)
+if [ -f "/engrfs/project/jacobsn/hiqbal/conda/envs/satclip/bin/activate" ]; then
+    source /engrfs/project/jacobsn/hiqbal/conda/envs/satclip/bin/activate
+elif [ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]; then
     source "${HOME}/miniconda3/etc/profile.d/conda.sh"
     conda activate satclip
 elif [ -f "${HOME}/anaconda3/etc/profile.d/conda.sh" ]; then
     source "${HOME}/anaconda3/etc/profile.d/conda.sh"
     conda activate satclip
 fi
+
+# Set HuggingFace cache to temp pool to avoid quota issues
+export HF_DATASETS_CACHE=/engrfs/tmp/jacobsn/hiqbal_satclip/hf_cache
+export HF_HOME=/engrfs/tmp/jacobsn/hiqbal_satclip/hf_home
 
 # Print environment info
 echo ""
@@ -136,9 +144,9 @@ fi
 cd "${PROJECT_ROOT}"
 echo "Project root: $(pwd)"
 
-# Base config
+# Base config (use multispectral config for local HF dataset)
 CMD="python -m experiments.train"
-CMD="$CMD --config experiments/configs/experiments/contrastive.yaml"
+CMD="$CMD --config experiments/configs/experiments/contrastive_multispectral.yaml"
 
 # Encoding config
 if [ -f "experiments/configs/encodings/${ENCODING}.yaml" ]; then
