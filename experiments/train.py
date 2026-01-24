@@ -364,7 +364,7 @@ def main():
 
     # Train
     print("\nStarting training...")
-    trainer.fit(model, datamodule)
+    trainer.fit(model, datamodule=datamodule)
 
     # Print results
     print("\n" + "=" * 60)
