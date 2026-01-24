@@ -16,8 +16,14 @@
 #   # Submit with test mode (2 epochs each):
 #   ./run_activation_experiments.sh --test
 #
+#   # Submit with short mode (50 epochs for monitoring):
+#   ./run_activation_experiments.sh --short
+#
 #   # Submit only spline:
 #   ./run_activation_experiments.sh --only spline
+#
+#   # Submit only spline with short mode:
+#   ./run_activation_experiments.sh --only spline --short
 #
 # =============================================================================
 
@@ -25,6 +31,7 @@ set -e
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TEST_MODE=""
+SHORT_MODE=""
 ONLY_ACTIVATION=""
 
 # Parse arguments
@@ -32,6 +39,10 @@ while [[ $# -gt 0 ]]; do
     case $1 in
         --test)
             TEST_MODE="--test"
+            shift
+            ;;
+        --short)
+            SHORT_MODE="--short"
             shift
             ;;
         --only)
@@ -50,6 +61,7 @@ echo "Activation Function Experiments"
 echo "=============================================="
 echo "Script dir: $SCRIPT_DIR"
 echo "Test mode: ${TEST_MODE:-no}"
+echo "Short mode: ${SHORT_MODE:-no}"
 echo "Only activation: ${ONLY_ACTIVATION:-all}"
 echo ""
 
@@ -65,7 +77,7 @@ submit_job() {
         "${SCRIPT_DIR}/submit_contrastive.sh" \
         --activation "$activation" \
         --encoding "$encoding" \
-        $TEST_MODE)
+        $TEST_MODE $SHORT_MODE)
 
     echo "  -> Job ID: $JOB_ID"
     echo ""
