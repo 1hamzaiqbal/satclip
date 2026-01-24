@@ -10,7 +10,7 @@ from torch import Tensor
 from torch.utils.data import Dataset, DataLoader
 import torchvision.transforms as T
 import numpy as np
-import pytorch_lightning as pl
+import lightning.pytorch as pl
 
 from .coord_utils import coordinate_jitter
 
