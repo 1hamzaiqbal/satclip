@@ -638,6 +638,118 @@ def evaluate_all_tasks(model, data_dir=DEFAULT_DATA_DIR, device='cuda',
 
 
 # ==============================================================================
+# Model Loading
+# ==============================================================================
+
+def load_location_encoder(checkpoint_path: str, device: str = 'cuda'):
+    """Load a location encoder from a checkpoint.
+
+    Supports:
+    - Lightning checkpoints (.ckpt) from LearnedActivationsModule or ContrastiveLearningModule
+    - Raw state dict checkpoints (.pt, .pth)
+
+    Args:
+        checkpoint_path: Path to model checkpoint
+        device: Device to load model on
+
+    Returns:
+        model: Location encoder model ready for inference
+    """
+    from experiments.models.location_encoder import LocationEncoder
+
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    # Check if this is a Lightning checkpoint (has 'hyper_parameters' or 'state_dict')
+    if isinstance(checkpoint, dict) and 'hyper_parameters' in checkpoint:
+        hparams = checkpoint['hyper_parameters']
+        state_dict = checkpoint['state_dict']
+
+        # Determine which module type based on hparams
+        if 'vision_encoder' in hparams:
+            # ContrastiveLearningModule - extract location_encoder
+            print("Detected ContrastiveLearningModule checkpoint")
+
+            # Build location encoder from hparams
+            model = LocationEncoder(
+                encoding_type=hparams.get('encoding_type', 'spherical_harmonics'),
+                encoding_config=hparams.get('encoding_config', {}),
+                hidden_dim=hparams.get('hidden_dim', 256),
+                output_dim=hparams.get('embed_dim', 256),
+                num_layers=hparams.get('num_layers', 2),
+                activation_type=hparams.get('activation_type', 'siren'),
+                activation_config=hparams.get('activation_config', {}),
+            )
+
+            # Extract location_encoder weights from state_dict
+            loc_state_dict = {}
+            prefix = 'location_encoder.'
+            for k, v in state_dict.items():
+                if k.startswith(prefix):
+                    loc_state_dict[k[len(prefix):]] = v
+
+            model.load_state_dict(loc_state_dict)
+            print(f"Loaded location encoder with {sum(p.numel() for p in model.parameters())} parameters")
+
+        else:
+            # LearnedActivationsModule - extract the inner model
+            print("Detected LearnedActivationsModule checkpoint")
+
+            model = LocationEncoder(
+                encoding_type=hparams.get('encoding_type', 'spherical_harmonics'),
+                encoding_config=hparams.get('encoding_config', {}),
+                hidden_dim=hparams.get('hidden_dim', 256),
+                output_dim=hparams.get('num_classes', 256),
+                num_layers=hparams.get('num_layers', 3),
+                activation_type=hparams.get('activation_type', 'relu'),
+                activation_config=hparams.get('activation_config', {}),
+            )
+
+            # Extract model weights (LocationRegressor contains LocationEncoder)
+            loc_state_dict = {}
+            prefix = 'model.encoder.'
+            for k, v in state_dict.items():
+                if k.startswith(prefix):
+                    loc_state_dict[k[len(prefix):]] = v
+
+            if loc_state_dict:
+                model.load_state_dict(loc_state_dict)
+            else:
+                # Try direct model loading
+                prefix = 'model.'
+                for k, v in state_dict.items():
+                    if k.startswith(prefix):
+                        loc_state_dict[k[len(prefix):]] = v
+                model.load_state_dict(loc_state_dict, strict=False)
+
+            print(f"Loaded model with {sum(p.numel() for p in model.parameters())} parameters")
+
+    elif isinstance(checkpoint, dict) and 'state_dict' in checkpoint:
+        # Simple state dict checkpoint with config
+        print("Detected state_dict checkpoint")
+
+        config = checkpoint.get('config', {})
+        model = LocationEncoder(**config)
+        model.load_state_dict(checkpoint['state_dict'])
+
+    elif isinstance(checkpoint, dict):
+        # Raw state dict - try to infer config from keys
+        print("Detected raw state dict checkpoint")
+        print("Warning: Attempting to infer model config from state dict keys")
+
+        # Create default model and try to load
+        model = LocationEncoder()
+        model.load_state_dict(checkpoint, strict=False)
+
+    else:
+        raise ValueError(f"Unknown checkpoint format: {type(checkpoint)}")
+
+    model = model.to(device)
+    model.eval()
+
+    return model
+
+
+# ==============================================================================
 # Main Entry Point
 # ==============================================================================
 
@@ -661,29 +773,23 @@ def main():
 
     args = parser.parse_args()
 
-    # Load model - adjust this based on your model format
+    # Load model
     print(f"Loading model from {args.model_path}")
-    # model = load_your_model(args.model_path)  # Implement based on your model
+    model = load_location_encoder(args.model_path, args.device)
 
-    # For now, print a placeholder message
-    print("NOTE: Implement model loading based on your checkpoint format")
-    print("Example:")
-    print("  checkpoint = torch.load(args.model_path)")
-    print("  model = YourLocationEncoder(**checkpoint['config'])")
-    print("  model.load_state_dict(checkpoint['state_dict'])")
+    # Run evaluation
+    results = evaluate_all_tasks(
+        model, args.data_dir, args.device, args.batch_size, args.num_workers, args.tasks
+    )
 
-    # Uncomment when model loading is implemented:
-    # results = evaluate_all_tasks(
-    #     model, args.data_dir, args.device, args.batch_size, args.num_workers, args.tasks
-    # )
-
-    # if args.output_dir:
-    #     os.makedirs(args.output_dir, exist_ok=True)
-    #     results_path = os.path.join(args.output_dir, 'eval_results.json')
-    #     import json
-    #     with open(results_path, 'w') as f:
-    #         json.dump(results, f, indent=2)
-    #     print(f"\nResults saved to {results_path}")
+    # Save results
+    if args.output_dir:
+        import json
+        os.makedirs(args.output_dir, exist_ok=True)
+        results_path = os.path.join(args.output_dir, 'eval_results.json')
+        with open(results_path, 'w') as f:
+            json.dump(results, f, indent=2)
+        print(f"\nResults saved to {results_path}")
 
 
 if __name__ == '__main__':

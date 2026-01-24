@@ -141,7 +141,24 @@ echo ""
 # =============================================================================
 
 # Change to project directory
-cd "${SLURM_SUBMIT_DIR}/../.."
+# Find project root by looking for experiments directory
+# Works whether submitting from repo root, scripts/, or slurm/ subdirectory
+if [ -d "${SLURM_SUBMIT_DIR}/experiments" ]; then
+    PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
+elif [ -d "${SLURM_SUBMIT_DIR}/../experiments" ]; then
+    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/.."
+elif [ -d "${SLURM_SUBMIT_DIR}/../../experiments" ]; then
+    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/../.."
+elif [ -d "${SLURM_SUBMIT_DIR}/../../../experiments" ]; then
+    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/../../.."
+else
+    echo "ERROR: Could not find project root (looking for experiments/ directory)"
+    echo "SLURM_SUBMIT_DIR: ${SLURM_SUBMIT_DIR}"
+    exit 1
+fi
+
+cd "${PROJECT_ROOT}"
+echo "Project root: $(pwd)"
 
 # Create output directory
 mkdir -p "${OUTPUT_DIR}"

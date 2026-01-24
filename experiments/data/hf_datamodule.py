@@ -88,8 +88,8 @@ def get_hf_transform(
         # Coordinate jitter for augmentation
         point = coordinate_jitter(point, radius=jitter_radius)
 
-        # Convert from (lon, lat) to (lat, lon) for consistency with model
-        point = torch.stack([point[1], point[0]])  # (lat, lon)
+        # Keep as (lon, lat) - this is what the location encoders expect
+        # point is already in (lon, lat) order from the dataset
 
         return {"image": image, "point": point}
 
@@ -262,9 +262,9 @@ if __name__ == "__main__":
         print(f"\n  B10 (zero-padded) channel mean: {b10_channel.mean().item():.6f}")
         print(f"  B10 channel should be all zeros: {(b10_channel == 0).all().item()}")
 
-    print(f"\nCoordinate statistics (lat, lon):")
-    print(f"  Lat range: [{coords[:, 0].min().item():.2f}, {coords[:, 0].max().item():.2f}]")
-    print(f"  Lon range: [{coords[:, 1].min().item():.2f}, {coords[:, 1].max().item():.2f}]")
+    print(f"\nCoordinate statistics (lon, lat):")
+    print(f"  Lon range: [{coords[:, 0].min().item():.2f}, {coords[:, 0].max().item():.2f}]")
+    print(f"  Lat range: [{coords[:, 1].min().item():.2f}, {coords[:, 1].max().item():.2f}]")
 
     print("\n" + "=" * 60)
     print("Test complete!")

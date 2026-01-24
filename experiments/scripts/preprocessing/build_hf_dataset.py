@@ -29,6 +29,7 @@ import sys
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 import multiprocessing
+from typing import Optional
 
 
 def check_dependencies():
@@ -110,7 +111,7 @@ def extract_tar_files(data_dir: Path, output_dir: Path, num_workers: int = 4):
             print(f"\n{result}")
 
 
-def load_tif_file(filepath: Path) -> np.ndarray | None:
+def load_tif_file(filepath: Path) -> Optional[np.ndarray]:
     """Load a TIF file and return as numpy array.
 
     Tries multiple backends for compatibility.

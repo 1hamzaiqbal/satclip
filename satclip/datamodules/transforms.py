@@ -24,7 +24,11 @@ def get_train_transform(resize_crop_size = 256,
     )
 
     def transform(sample):
-        image = sample["image"].numpy().transpose(1,2,0)
+        image = sample["image"]
+        # Handle both tensor and numpy array inputs
+        if hasattr(image, 'numpy'):
+            image = image.numpy()
+        image = image.transpose(1, 2, 0)
         point = sample["point"]
 
         image = augmentation(image=image)["image"]
