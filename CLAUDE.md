@@ -38,14 +38,52 @@ ssh hiqbal@shell.engr.wustl.edu 'cat /engrfs/project/jacobsn/hiqbal/src/satclip/
 
 ---
 
-## Key Paths (WUSTL HPC)
+## Environment Variables
+
+All paths are managed via `env.sh` and `experiments/utils/paths.py`.
+Scripts auto-detect HPC vs local environment.
+
+### Setup
+```bash
+# Source env.sh (auto-detects environment)
+source env.sh
+
+# Or force specific environment
+source env.sh hpc    # HPC paths
+source env.sh local  # Local paths
+
+# Check what's set
+echo $SATCLIP_ROOT
+echo $SATCLIP_DATA_DIR
+```
+
+### Key Variables
+| Variable | HPC Value | Description |
+|----------|-----------|-------------|
+| `SATCLIP_ROOT` | `/engrfs/project/jacobsn/hiqbal/src/satclip` | Project root |
+| `SATCLIP_DATA_DIR` | `/engrfs/tmp/jacobsn/hiqbal_satclip` | Data/logs base |
+| `SATCLIP_DATASET_PATH` | `$SATCLIP_DATA_DIR/satclip_hf_preprocessed` | HF dataset |
+| `SATCLIP_LOGS_DIR` | `$SATCLIP_DATA_DIR/logs` | Training logs |
+| `SATCLIP_CONDA_ENV` | `/engrfs/project/jacobsn/hiqbal/conda/envs/satclip` | Conda env |
+
+### In Python
+```python
+from experiments.utils.paths import get_paths, is_hpc
+paths = get_paths()
+print(paths.dataset)  # Auto-detected dataset path
+print(paths.logs)     # Auto-detected logs path
+```
+
+---
+
+## Key Paths (Reference)
 
 ### Repository
 | Description | Path |
 |-------------|------|
-| SatCLIP repo | `/engrfs/project/jacobsn/hiqbal/src/satclip` |
+| SatCLIP repo | `$SATCLIP_ROOT` |
 | Local mirror | `/Users/hamzaiqbal/grad/learned_activation/satclip` |
-| Conda env | `/engrfs/project/jacobsn/hiqbal/conda/envs/satclip` |
+| Conda env | `$SATCLIP_CONDA_ENV` |
 
 ### Data & Outputs (Temp Pool - Unlimited Quota)
 | Description | Path |

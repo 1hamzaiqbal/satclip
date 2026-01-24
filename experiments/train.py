@@ -56,6 +56,7 @@ from experiments.data import (
     HFMultispectralDataModule,
 )
 from experiments.callbacks import SplineVisualizationCallback, GlobeVisualizationCallback, EpochLoggerCallback
+from experiments.utils.paths import get_paths, Paths
 
 
 def parse_args():
@@ -129,8 +130,12 @@ def get_datamodule(config: Config) -> pl.LightningDataModule:
 
     elif dataset == "satclip_multispectral" or data_config.get("use_hf_dataset", False):
         # HuggingFace Arrow-based multispectral dataset (fast, preprocessed)
+        # Use paths module for default dataset path if not specified
+        dataset_path = data_config.get("hf_dataset_path")
+        if not dataset_path:
+            dataset_path = Paths.get_dataset_path()
         return HFMultispectralDataModule(
-            dataset_path=data_config.get("hf_dataset_path"),
+            dataset_path=dataset_path,
             batch_size=data_config.get("batch_size", 256),
             num_workers=data_config.get("num_workers", 8),
             crop_size=data_config.get("crop_size", 224),
@@ -310,21 +315,26 @@ def get_logger(config: Config) -> pl.loggers.Logger:
     experiment_name = config.experiment.get("name", "experiment")
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
+    # Use paths module for default save_dir if not specified
+    save_dir = logging_config.get("save_dir")
+    if not save_dir:
+        save_dir = Paths.get_logs_dir()
+
     if logger_type == "tensorboard":
         return TensorBoardLogger(
-            save_dir=logging_config.get("save_dir", "./logs"),
+            save_dir=save_dir,
             name=logging_config.get("name", "experiments"),
             version=f"{experiment_name}_{timestamp}",
         )
     elif logger_type == "csv":
         return CSVLogger(
-            save_dir=logging_config.get("save_dir", "./logs"),
+            save_dir=save_dir,
             name=f"{experiment_name}_{timestamp}",
         )
     else:
         # Default to TensorBoard
         return TensorBoardLogger(
-            save_dir="./logs",
+            save_dir=save_dir,
             name=experiment_name,
         )
 

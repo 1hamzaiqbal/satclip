@@ -29,6 +29,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from experiments.models.lightning_module import ContrastiveLearningModule
 from experiments.data import HFMultispectralDataModule
 from experiments.callbacks import EpochLoggerCallback
+from experiments.utils.paths import get_paths
 
 
 def test_checkpoints():
@@ -37,9 +38,10 @@ def test_checkpoints():
     print("Checkpoint Saving Verification Test")
     print("=" * 60)
 
-    # Paths
-    dataset_path = "/engrfs/tmp/jacobsn/hiqbal_satclip/satclip_hf_preprocessed"
-    output_dir = "/engrfs/tmp/jacobsn/hiqbal_satclip/test_checkpoint_save"
+    # Get paths from environment
+    paths = get_paths()
+    dataset_path = str(paths.dataset)
+    output_dir = str(paths.data_dir / "test_checkpoint_save")
 
     # Clean previous test output
     if os.path.exists(output_dir):

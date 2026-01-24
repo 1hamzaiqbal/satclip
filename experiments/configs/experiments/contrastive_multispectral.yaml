@@ -69,7 +69,8 @@ data:
 
   # HuggingFace Arrow dataset settings
   use_hf_dataset: true
-  hf_dataset_path: "/engrfs/tmp/jacobsn/hiqbal_satclip/satclip_hf_preprocessed"
+  # hf_dataset_path: auto-detected from $SATCLIP_DATASET_PATH or paths.py
+  hf_dataset_path: null  # Set via env var or CLI: --data.hf_dataset_path=/path
 
   # Image settings
   crop_size: 224  # Match SSL4EO-S12 pretrained model
@@ -108,8 +109,8 @@ training:
 # ---------------------
 logging:
   logger: "tensorboard"
-  # Using temp pool for logs (unlimited quota) instead of project folder
-  save_dir: "/engrfs/tmp/jacobsn/hiqbal_satclip/logs"
+  # save_dir: auto-detected from $SATCLIP_LOGS_DIR or paths.py
+  save_dir: null  # Set via env var or CLI: --logging.save_dir=/path
   name: "contrastive_multispectral"
 
   # Frequent logging for monitoring

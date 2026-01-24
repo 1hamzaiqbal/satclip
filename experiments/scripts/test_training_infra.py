@@ -32,6 +32,7 @@ from lightning.pytorch.loggers import TensorBoardLogger
 
 from experiments.models.lightning_module import ContrastiveLearningModule
 from experiments.data import HFMultispectralDataModule
+from experiments.utils.paths import get_paths
 
 
 def test_training():
@@ -40,9 +41,10 @@ def test_training():
     print("SatCLIP Training Infrastructure Test")
     print("=" * 60)
 
-    # Configuration
-    dataset_path = "/engrfs/tmp/jacobsn/hiqbal_satclip/satclip_hf_preprocessed"
-    output_dir = "/engrfs/tmp/jacobsn/hiqbal_satclip/test_output"
+    # Get paths from environment
+    paths = get_paths()
+    dataset_path = str(paths.dataset)
+    output_dir = str(paths.data_dir / "test_output")
 
     print(f"\nDataset path: {dataset_path}")
     print(f"Output directory: {output_dir}")

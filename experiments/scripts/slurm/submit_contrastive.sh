@@ -1,49 +1,59 @@
 #!/bin/bash
-#SBATCH -J satclip_contrastive          # Job name
-#SBATCH -o logs/%x_%j.out               # Output file
-#SBATCH -e logs/%x_%j.err               # Error file
-#SBATCH -p condo-jacobsn                # Partition (your lab's partition)
-#SBATCH --gpus a40:1                    # Request 1 A40 GPU
-#SBATCH -A engr-lab-jacobsn             # Account
-#SBATCH -t 24:00:00                     # Time limit (24 hours for full training)
-#SBATCH --mem=64G                       # Memory (larger for image data)
-#SBATCH -n 1                            # Number of tasks
-#SBATCH -c 8                            # CPUs per task
+#SBATCH -J satclip_contrastive
+#SBATCH -o logs/satclip_contrastive_%j.out
+#SBATCH -e logs/satclip_contrastive_%j.err
+#SBATCH -p condo-jacobsn
+#SBATCH --gpus a40:1
+#SBATCH -A engr-lab-jacobsn
+#SBATCH -t 24:00:00
+#SBATCH --mem=64G
+#SBATCH -n 1
+#SBATCH -c 8
 
 # =============================================================================
 # SLURM Job Script for SatCLIP Contrastive Training
 # =============================================================================
 #
-# Trains a SatCLIP model with custom learned activation functions using
-# the S2-100K Sentinel-2 satellite imagery dataset.
-#
 # Usage:
-#   # Default (SIREN + SH, like original paper):
-#   sbatch submit_contrastive.sh
-#
-#   # With splines instead of SIREN:
-#   sbatch submit_contrastive.sh --activation spline
-#
-#   # With ReLU (often better than SIREN!):
-#   sbatch submit_contrastive.sh --activation relu
-#
-#   # With ViT vision encoder:
-#   sbatch submit_contrastive.sh --vision moco_vit16
-#
-#   # Higher resolution SH:
-#   sbatch submit_contrastive.sh --encoding sh_l20
-#
-#   # Quick test (2 epochs):
-#   sbatch submit_contrastive.sh --test
-#
-#   # Short monitoring run (50 epochs):
-#   sbatch submit_contrastive.sh --short --activation spline
+#   sbatch submit_contrastive.sh                          # Default (SIREN + SH)
+#   sbatch submit_contrastive.sh --activation spline      # Spline activation
+#   sbatch submit_contrastive.sh --short --activation spline  # 50 epoch monitoring
+#   sbatch submit_contrastive.sh --test                   # Quick 2 epoch test
 #
 # =============================================================================
 
 set -e
 
-# Default values
+# =============================================================================
+# Load Environment
+# =============================================================================
+
+# Find and source env.sh (search up from script location)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE=""
+
+for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/.." "$SCRIPT_DIR/../.." "$SCRIPT_DIR/../../.."; do
+    if [ -f "$dir/env.sh" ]; then
+        ENV_FILE="$dir/env.sh"
+        break
+    fi
+done
+
+if [ -n "$ENV_FILE" ]; then
+    source "$ENV_FILE"
+    echo "Loaded environment from: $ENV_FILE"
+else
+    echo "Warning: env.sh not found, using defaults"
+    # Fallback defaults
+    export SATCLIP_ROOT="/engrfs/project/jacobsn/hiqbal/src/satclip"
+    export SATCLIP_DATA_DIR="/engrfs/tmp/jacobsn/hiqbal_satclip"
+    export SATCLIP_CONDA_ENV="/engrfs/project/jacobsn/hiqbal/conda/envs/satclip"
+fi
+
+# =============================================================================
+# Parse Arguments
+# =============================================================================
+
 ACTIVATION="siren"
 ENCODING="sh_l10"
 VISION="moco_resnet18"
@@ -51,48 +61,27 @@ TEST_MODE=false
 SHORT_MODE=false
 EXTRA_ARGS=""
 
-# Parse arguments
 while [[ $# -gt 0 ]]; do
     case $1 in
-        --activation)
-            ACTIVATION="$2"
-            shift 2
-            ;;
-        --encoding)
-            ENCODING="$2"
-            shift 2
-            ;;
-        --vision)
-            VISION="$2"
-            shift 2
-            ;;
-        --test)
-            TEST_MODE=true
-            shift
-            ;;
-        --short)
-            SHORT_MODE=true
-            shift
-            ;;
-        *)
-            EXTRA_ARGS="$EXTRA_ARGS $1"
-            shift
-            ;;
+        --activation) ACTIVATION="$2"; shift 2 ;;
+        --encoding) ENCODING="$2"; shift 2 ;;
+        --vision) VISION="$2"; shift 2 ;;
+        --test) TEST_MODE=true; shift ;;
+        --short) SHORT_MODE=true; shift ;;
+        *) EXTRA_ARGS="$EXTRA_ARGS $1"; shift ;;
     esac
 done
 
-# Create logs directory on project storage
-LOGS_DIR=/engrfs/project/jacobsn/hiqbal/logs/satclip_contrastive
-mkdir -p $LOGS_DIR
-mkdir -p logs  # Also keep local logs symlinked
+# =============================================================================
+# Print Configuration
+# =============================================================================
 
-# Print job info
 echo "=============================================="
 echo "SatCLIP Contrastive Training"
 echo "=============================================="
 echo "SLURM Job ID: ${SLURM_JOB_ID}"
-echo "Node: ${SLURM_NODELIST}"
-echo "GPUs: ${SLURM_GPUS}"
+echo "Node: $(hostname)"
+echo "GPUs: ${SLURM_GPUS:-a40:1}"
 echo "Start time: $(date)"
 echo ""
 echo "Configuration:"
@@ -102,27 +91,26 @@ echo "  Vision: $VISION"
 echo "  Test mode: $TEST_MODE"
 echo "  Short mode: $SHORT_MODE"
 echo "=============================================="
+echo ""
+echo "Paths:"
+echo "  SATCLIP_ROOT: ${SATCLIP_ROOT}"
+echo "  SATCLIP_DATA_DIR: ${SATCLIP_DATA_DIR}"
+echo "  SATCLIP_LOGS_DIR: ${SATCLIP_LOGS_DIR:-${SATCLIP_DATA_DIR}/logs}"
+echo "=============================================="
 
 # =============================================================================
 # Environment Setup
 # =============================================================================
 
-# Conda environment (WashU RIS HPC)
-if [ -f "/engrfs/project/jacobsn/hiqbal/conda/envs/satclip/bin/activate" ]; then
-    source /engrfs/project/jacobsn/hiqbal/conda/envs/satclip/bin/activate
-elif [ -f "${HOME}/miniconda3/etc/profile.d/conda.sh" ]; then
-    source "${HOME}/miniconda3/etc/profile.d/conda.sh"
-    conda activate satclip
-elif [ -f "${HOME}/anaconda3/etc/profile.d/conda.sh" ]; then
-    source "${HOME}/anaconda3/etc/profile.d/conda.sh"
-    conda activate satclip
+# Activate conda environment
+if [ -n "$SATCLIP_CONDA_ENV" ] && [ -f "${SATCLIP_CONDA_ENV}/bin/activate" ]; then
+    source "${SATCLIP_CONDA_ENV}/bin/activate"
 fi
 
-# Set HuggingFace cache to temp pool to avoid quota issues
-export HF_DATASETS_CACHE=/engrfs/tmp/jacobsn/hiqbal_satclip/hf_cache
-export HF_HOME=/engrfs/tmp/jacobsn/hiqbal_satclip/hf_home
+# Set HuggingFace cache
+export HF_DATASETS_CACHE="${SATCLIP_DATA_DIR}/hf_cache"
+export HF_HOME="${SATCLIP_DATA_DIR}/hf_home"
 
-# Print environment info
 echo ""
 echo "Environment:"
 echo "  Python: $(which python)"
@@ -135,54 +123,33 @@ echo ""
 # Build Training Command
 # =============================================================================
 
-# Find project root by looking for experiments directory
-if [ -d "${SLURM_SUBMIT_DIR}/experiments" ]; then
-    PROJECT_ROOT="${SLURM_SUBMIT_DIR}"
-elif [ -d "${SLURM_SUBMIT_DIR}/../experiments" ]; then
-    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/.."
-elif [ -d "${SLURM_SUBMIT_DIR}/../../experiments" ]; then
-    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/../.."
-elif [ -d "${SLURM_SUBMIT_DIR}/../../../experiments" ]; then
-    PROJECT_ROOT="${SLURM_SUBMIT_DIR}/../../.."
-else
-    echo "ERROR: Could not find project root (looking for experiments/ directory)"
-    echo "SLURM_SUBMIT_DIR: ${SLURM_SUBMIT_DIR}"
-    exit 1
-fi
+cd "${SATCLIP_ROOT}"
+echo "Project root: ${SATCLIP_ROOT}"
 
-cd "${PROJECT_ROOT}"
-echo "Project root: $(pwd)"
-
-# Base config (use multispectral config for local HF dataset)
+# Build command using environment paths
 CMD="python -m experiments.train"
 CMD="$CMD --config experiments/configs/experiments/contrastive_multispectral.yaml"
 
 # Encoding config
 if [ -f "experiments/configs/encodings/${ENCODING}.yaml" ]; then
     CMD="$CMD --config experiments/configs/encodings/${ENCODING}.yaml"
-else
-    echo "Warning: Encoding config not found: experiments/configs/encodings/${ENCODING}.yaml"
 fi
 
 # Activation config
 if [ -f "experiments/configs/activations/${ACTIVATION}.yaml" ]; then
     CMD="$CMD --config experiments/configs/activations/${ACTIVATION}.yaml"
-else
-    echo "Warning: Activation config not found: experiments/configs/activations/${ACTIVATION}.yaml"
 fi
 
 # Vision encoder
 CMD="$CMD --model.vision_encoder=$VISION"
 
-# Test mode (2 epochs, small batch)
+# Test mode
 if [ "$TEST_MODE" = true ]; then
-    CMD="$CMD --training.max_epochs=2"
-    CMD="$CMD --data.batch_size=32"
-    CMD="$CMD --training.accumulate_grad_batches=1"
-    echo "TEST MODE: Running quick validation (2 epochs, batch_size=32)"
+    CMD="$CMD --training.max_epochs=2 --data.batch_size=32 --training.accumulate_grad_batches=1"
+    echo "TEST MODE: Running 2 epochs with batch_size=32"
 fi
 
-# Short mode (50 epochs for monitoring)
+# Short mode
 if [ "$SHORT_MODE" = true ]; then
     CMD="$CMD --config experiments/configs/experiments/contrastive_short.yaml"
     echo "SHORT MODE: Running 50 epochs for monitoring"
@@ -201,7 +168,6 @@ echo ""
 
 eval $CMD
 
-# Print completion
 echo ""
 echo "=============================================="
 echo "Job completed at: $(date)"
