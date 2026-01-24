@@ -56,12 +56,14 @@ echo "=============================================="
 # =============================================================================
 
 # Path to raw data (tar.xz files and index.csv)
-DATA_DIR="${DATA_DIR:-/projects/bdbk/cherd/data/satclip_manual}"
+# UPDATE THESE PATHS FOR YOUR ENVIRONMENT
+DATA_DIR="${DATA_DIR:-/engrfs/project/jacobsn/hiqbal/data_raw/satclip}"
 
 # Output paths (on fast storage, e.g., scratch or project space)
-TIF_DIR="${TIF_DIR:-${DATA_DIR}/tif}"
-HF_OUTPUT="${HF_OUTPUT:-${DATA_DIR}/satclip_hf}"
-PREPROCESSED_OUTPUT="${PREPROCESSED_OUTPUT:-${DATA_DIR}/satclip_hf_preprocessed}"
+OUTPUT_BASE="${OUTPUT_BASE:-/engrfs/project/jacobsn/hiqbal/data_processed/satclip}"
+TIF_DIR="${TIF_DIR:-${OUTPUT_BASE}/tif}"
+HF_OUTPUT="${HF_OUTPUT:-${OUTPUT_BASE}/satclip_hf}"
+PREPROCESSED_OUTPUT="${PREPROCESSED_OUTPUT:-${OUTPUT_BASE}/satclip_hf_preprocessed}"
 
 # Processing options
 SKIP_EXTRACT="${SKIP_EXTRACT:-false}"

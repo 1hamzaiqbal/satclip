@@ -69,7 +69,7 @@ data:
 
   # HuggingFace Arrow dataset settings
   use_hf_dataset: true
-  hf_dataset_path: "/projects/bdbk/cherd/data/satclip_manual/satclip_hf_preprocessed"
+  hf_dataset_path: "/engrfs/project/jacobsn/hiqbal/data_processed/satclip/satclip_hf_preprocessed"
 
   # Image settings
   crop_size: 224  # Match SSL4EO-S12 pretrained model
