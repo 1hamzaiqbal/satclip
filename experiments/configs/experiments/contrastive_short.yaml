@@ -1,0 +1,37 @@
+# Short training run for monitoring and debugging
+# ================================================
+#
+# Use this config to override the full training config for
+# initial runs where you want to see loss curves and outputs
+# before committing to a full 500-epoch run.
+#
+# Usage:
+#   python -m experiments.train \
+#     --config experiments/configs/experiments/contrastive_multispectral.yaml \
+#     --config experiments/configs/activations/spline.yaml \
+#     --config experiments/configs/experiments/contrastive_short.yaml
+
+training:
+  max_epochs: 50  # Short run for monitoring
+  warmup_epochs: 5  # Proportionally shorter warmup
+
+logging:
+  log_every_n_steps: 20  # More frequent logging for monitoring
+
+  # Save checkpoints more frequently during short runs
+  checkpoint:
+    save_top_k: 3
+    every_n_epochs: 10
+    save_last: true
+
+  # Spline visualization (if using spline activation)
+  spline_viz:
+    log_every_n_epochs: 5  # More frequent spline visualization
+
+  # Globe visualization (PCA embeddings on world map)
+  globe_viz:
+    enabled: true
+    log_every_n_epochs: 10  # Every 10 epochs
+    log_on_train_start: true
+    lat_resolution: 60  # Lower res for faster rendering
+    lon_resolution: 120

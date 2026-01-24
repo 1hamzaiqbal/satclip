@@ -108,7 +108,8 @@ training:
 # ---------------------
 logging:
   logger: "tensorboard"
-  save_dir: "/engrfs/project/jacobsn/hiqbal/logs/satclip"
+  # Using temp pool for logs (unlimited quota) instead of project folder
+  save_dir: "/engrfs/tmp/jacobsn/hiqbal_satclip/logs"
   name: "contrastive_multispectral"
 
   # Frequent logging for monitoring
@@ -120,6 +121,14 @@ logging:
     mode: "min"
     save_last: true
     every_n_epochs: 10  # Also save every 10 epochs for safety
+
+  # Globe visualization (PCA embeddings on world map)
+  globe_viz:
+    enabled: true
+    log_every_n_epochs: 25  # Every 25 epochs for full runs
+    log_on_train_start: true
+    lat_resolution: 90
+    lon_resolution: 180
 
 # Hardware Configuration
 # ----------------------

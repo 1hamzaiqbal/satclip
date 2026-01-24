@@ -36,6 +36,9 @@
 #   # Quick test (2 epochs):
 #   sbatch submit_contrastive.sh --test
 #
+#   # Short monitoring run (50 epochs):
+#   sbatch submit_contrastive.sh --short --activation spline
+#
 # =============================================================================
 
 set -e
@@ -45,6 +48,7 @@ ACTIVATION="siren"
 ENCODING="sh_l10"
 VISION="moco_resnet18"
 TEST_MODE=false
+SHORT_MODE=false
 EXTRA_ARGS=""
 
 # Parse arguments
@@ -64,6 +68,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         --test)
             TEST_MODE=true
+            shift
+            ;;
+        --short)
+            SHORT_MODE=true
             shift
             ;;
         *)
@@ -92,6 +100,7 @@ echo "  Activation: $ACTIVATION"
 echo "  Encoding: $ENCODING"
 echo "  Vision: $VISION"
 echo "  Test mode: $TEST_MODE"
+echo "  Short mode: $SHORT_MODE"
 echo "=============================================="
 
 # =============================================================================
@@ -165,12 +174,18 @@ fi
 # Vision encoder
 CMD="$CMD --model.vision_encoder=$VISION"
 
-# Test mode
+# Test mode (2 epochs, small batch)
 if [ "$TEST_MODE" = true ]; then
     CMD="$CMD --training.max_epochs=2"
     CMD="$CMD --data.batch_size=32"
     CMD="$CMD --training.accumulate_grad_batches=1"
     echo "TEST MODE: Running quick validation (2 epochs, batch_size=32)"
+fi
+
+# Short mode (50 epochs for monitoring)
+if [ "$SHORT_MODE" = true ]; then
+    CMD="$CMD --config experiments/configs/experiments/contrastive_short.yaml"
+    echo "SHORT MODE: Running 50 epochs for monitoring"
 fi
 
 # Extra args

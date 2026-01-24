@@ -13,3 +13,10 @@ model:
     input_range: [-3.0, 3.0]
     init: "relu"  # relu, linear, zero (NEVER use zero!)
     learnable_positions: false
+
+# Spline visualization settings (logged to TensorBoard)
+logging:
+  spline_viz:
+    log_every_n_epochs: 10  # Log spline shapes every 10 epochs
+    log_on_train_start: true  # Log initial shapes
+    input_range: [-4.0, 4.0]  # Range for plotting (extends beyond spline range)

@@ -22,6 +22,7 @@ Usage:
     python -m experiments.train --config ... --trainer.fast_dev_run=true
 """
 
+import os
 import sys
 import argparse
 from pathlib import Path
@@ -54,6 +55,7 @@ from experiments.data import (
     SatCLIPHuggingFaceDataModule,
     HFMultispectralDataModule,
 )
+from experiments.callbacks import SplineVisualizationCallback, GlobeVisualizationCallback, EpochLoggerCallback
 
 
 def parse_args():
@@ -220,11 +222,12 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
     )
 
 
-def get_callbacks(config: Config) -> List[pl.Callback]:
+def get_callbacks(config: Config, checkpoint_dir: str = None) -> List[pl.Callback]:
     """Create callbacks from config.
 
     Args:
         config: Configuration object
+        checkpoint_dir: Directory to save checkpoints (if None, uses logger default)
 
     Returns:
         List of callbacks
@@ -237,11 +240,13 @@ def get_callbacks(config: Config) -> List[pl.Callback]:
     checkpoint_config = logging_config.get("checkpoint", Config({}))
     callbacks.append(
         ModelCheckpoint(
+            dirpath=checkpoint_dir,  # Explicit directory for checkpoints
             monitor=checkpoint_config.get("monitor", "val_loss"),
             mode=checkpoint_config.get("mode", "min"),
             save_top_k=checkpoint_config.get("save_top_k", 1),
             save_last=checkpoint_config.get("save_last", True),
             filename="{epoch}-{val_loss:.4f}",
+            every_n_epochs=checkpoint_config.get("every_n_epochs", None),
         )
     )
 
@@ -258,6 +263,34 @@ def get_callbacks(config: Config) -> List[pl.Callback]:
 
     # Learning rate monitor
     callbacks.append(LearningRateMonitor(logging_interval="step"))
+
+    # Epoch logger for clear progress in SLURM logs
+    callbacks.append(EpochLoggerCallback())
+
+    # Spline visualization callback (only if using spline activation)
+    activation_type = config.model.activation.get("type", "relu")
+    if activation_type == "spline":
+        spline_viz_config = logging_config.get("spline_viz", Config({}))
+        callbacks.append(
+            SplineVisualizationCallback(
+                log_every_n_epochs=spline_viz_config.get("log_every_n_epochs", 10),
+                log_on_train_start=spline_viz_config.get("log_on_train_start", True),
+                input_range=tuple(spline_viz_config.get("input_range", [-4.0, 4.0])),
+            )
+        )
+
+    # Globe visualization callback (for contrastive learning)
+    task = config.data.get("task", "regression")
+    globe_viz_config = logging_config.get("globe_viz", Config({}))
+    if task == "contrastive" and globe_viz_config.get("enabled", True):
+        callbacks.append(
+            GlobeVisualizationCallback(
+                log_every_n_epochs=globe_viz_config.get("log_every_n_epochs", 10),
+                log_on_train_start=globe_viz_config.get("log_on_train_start", True),
+                lat_resolution=globe_viz_config.get("lat_resolution", 60),
+                lon_resolution=globe_viz_config.get("lon_resolution", 120),
+            )
+        )
 
     return callbacks
 
@@ -318,15 +351,31 @@ def main():
     # Convert to Config object
     config = Config(merged)
 
-    # Print config
+    # Print detailed config
     print("=" * 60)
-    print("Configuration")
+    print("Configuration Summary")
     print("=" * 60)
     print(f"Experiment: {config.experiment.get('name', 'unknown')}")
     print(f"Encoding: {config.model.encoding.get('type', 'unknown')}")
     print(f"Activation: {config.model.activation.get('type', 'unknown')}")
     print(f"Dataset: {config.data.get('dataset', 'unknown')}")
+    print(f"Task: {config.data.get('task', 'unknown')}")
+    print("-" * 60)
+    print("Training:")
+    print(f"  Max epochs: {config.training.get('max_epochs', 'N/A')}")
+    print(f"  Learning rate: {config.training.get('learning_rate', 'N/A')}")
+    print(f"  Batch size: {config.data.get('batch_size', 'N/A')}")
+    print(f"  Accumulate grad batches: {config.training.get('accumulate_grad_batches', 1)}")
+    print("-" * 60)
+    print("Logging:")
+    print(f"  Save dir: {config.logging.get('save_dir', './logs')}")
+    print(f"  Logger: {config.logging.get('logger', 'tensorboard')}")
+    print(f"  Log every N steps: {config.logging.get('log_every_n_steps', 50)}")
+    checkpoint_cfg = config.logging.get("checkpoint", Config({}))
+    print(f"  Checkpoint every N epochs: {checkpoint_cfg.get('every_n_epochs', 'end only')}")
+    print(f"  Save top K: {checkpoint_cfg.get('save_top_k', 1)}")
     print("=" * 60)
+    sys.stdout.flush()  # Ensure output is written immediately
 
     # Set seed
     seed = config.experiment.get("seed", 42)
@@ -341,13 +390,26 @@ def main():
     print("Creating model...")
     model = get_model(config, datamodule)
 
-    # Create callbacks and logger
-    callbacks = get_callbacks(config)
+    # Create logger first (to get checkpoint directory)
     logger = get_logger(config)
+
+    # Compute checkpoint directory based on logger's log_dir
+    checkpoint_dir = os.path.join(logger.log_dir, "checkpoints")
+    os.makedirs(checkpoint_dir, exist_ok=True)
+    print(f"Checkpoint directory: {checkpoint_dir}")
+
+    # Create callbacks with explicit checkpoint directory
+    callbacks = get_callbacks(config, checkpoint_dir=checkpoint_dir)
+    print(f"\nCallbacks ({len(callbacks)}):")
+    for cb in callbacks:
+        print(f"  - {cb.__class__.__name__}")
+    sys.stdout.flush()
 
     # Create trainer
     hardware = config.get("hardware", Config({}))
     training = config.training
+
+    logging_config = config.logging
 
     trainer = pl.Trainer(
         max_epochs=training.get("max_epochs", 100),
@@ -358,20 +420,48 @@ def main():
         logger=logger,
         gradient_clip_val=training.get("gradient_clip_val", None),
         accumulate_grad_batches=training.get("accumulate_grad_batches", 1),
+        log_every_n_steps=logging_config.get("log_every_n_steps", 50),
         enable_progress_bar=True,
         deterministic=config.get("reproducibility", Config({})).get("deterministic", True),
     )
 
+    # Print trainer info
+    print("\nTrainer configuration:")
+    print(f"  Accelerator: {trainer.accelerator}")
+    print(f"  Devices: {trainer.device_ids}")
+    print(f"  Precision: {trainer.precision}")
+    print(f"  Max epochs: {trainer.max_epochs}")
+    print(f"  Log dir: {logger.log_dir}")
+    print(f"  Checkpoint dir: {checkpoint_dir}")
+    sys.stdout.flush()
+
     # Train
-    print("\nStarting training...")
+    print("\n" + "=" * 60)
+    print("Starting training...")
+    print("=" * 60)
+    sys.stdout.flush()
+
     trainer.fit(model, datamodule=datamodule)
 
     # Print results
     print("\n" + "=" * 60)
     print("Training Complete")
     print("=" * 60)
-    print(f"Best model path: {trainer.checkpoint_callback.best_model_path}")
-    print(f"Best val_loss: {trainer.checkpoint_callback.best_model_score:.4f}")
+
+    if trainer.checkpoint_callback.best_model_path:
+        print(f"Best model path: {trainer.checkpoint_callback.best_model_path}")
+        print(f"Best val_loss: {trainer.checkpoint_callback.best_model_score:.4f}")
+    else:
+        print("No best model checkpoint found (training may have failed early)")
+
+    # List all saved checkpoints
+    if os.path.exists(checkpoint_dir):
+        checkpoints = [f for f in os.listdir(checkpoint_dir) if f.endswith('.ckpt')]
+        print(f"\nSaved checkpoints ({len(checkpoints)}):")
+        for ckpt in sorted(checkpoints):
+            print(f"  - {ckpt}")
+
+    sys.stdout.flush()
 
 
 if __name__ == "__main__":
