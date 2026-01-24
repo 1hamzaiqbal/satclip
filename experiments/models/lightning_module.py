@@ -348,7 +348,8 @@ class ContrastiveLearningModule(pl.LightningModule):
         Returns:
             (batch, embed_dim) normalized location embeddings
         """
-        return self.location_encoder(coords.double()).float()
+        # Use float32 for compatibility with mixed precision training
+        return self.location_encoder(coords.float())
 
     def forward(
         self, image: torch.Tensor, coords: torch.Tensor
