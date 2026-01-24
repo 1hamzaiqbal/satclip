@@ -1,37 +1,39 @@
 # SatCLIP Project - Quick Reference
 
-## VERIFIED: Infrastructure Working (Test Job 18475 Passed)
+## VERIFIED: Infrastructure Working
 
-Last verified: 2026-01-24 15:31 CST
-- Checkpoints: WORKING (saves to explicit `checkpoints/` subdirectory)
-- TensorBoard: WORKING
-- Data loading: WORKING (HF dataset loads correctly)
+Last verified: 2026-01-24 16:32 CST (Job 18479)
+- **Checkpoints**: WORKING (saves to explicit `checkpoints/` subdirectory)
+- **TensorBoard**: WORKING
+- **Data loading**: WORKING (HF dataset loads correctly)
+- **EpochLogger**: WORKING (prints `Epoch X/Y | Val Loss: Z.ZZZZ | Time: Xm Ys`)
+
+### Checkpoint Test Results (Job 18479)
+```
+5 epochs with 5 train batches each, checkpoints every 2 epochs:
+- epoch=1-val_loss=3.4388.ckpt (46.15 MB)
+- epoch=3-val_loss=3.3412.ckpt (46.16 MB)
+- last.ckpt (46.16 MB)
+```
+
+### Estimated Training Speed
+- With full dataset (84K samples), batch 512, 4x accumulation: ~41 steps/epoch
+- Each epoch: ~2-3 minutes on A40 with mixed precision
+- Epoch 10 checkpoint appears around 25-30 min into training
 
 ---
 
 ## Current Active Job
 
-| Field | Value |
-|-------|-------|
-| Job ID | 18476 |
-| Status | Running (spline activation, 50 epochs) |
-| Log Dir | `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260124_153711/` |
-| Checkpoint Dir | `...153711/checkpoints/` |
-| Started | 2026-01-24 15:37 CST |
+_No active job_
 
-### Quick Check Commands for Job 18476
+### Quick Check Commands
 ```bash
 # Check status
 ssh hiqbal@shell.engr.wustl.edu 'squeue -u hiqbal'
 
-# View output
-ssh hiqbal@shell.engr.wustl.edu 'cat /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_18476.out'
-
-# Check checkpoints
-ssh hiqbal@shell.engr.wustl.edu 'ls -la /engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260124_153711/checkpoints/'
-
-# Check TB file growth
-ssh hiqbal@shell.engr.wustl.edu 'ls -lh /engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260124_153711/events.out.*'
+# View latest job output (replace JOBID)
+ssh hiqbal@shell.engr.wustl.edu 'cat /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_<JOBID>.out'
 ```
 
 ---
@@ -216,15 +218,24 @@ checkpoints/
 
 ---
 
-## Sync Commands (Local to HPC)
+## Sync Commands (Local ↔ HPC)
 
-### Sync Single File
+### Git Sync (Preferred)
 ```bash
-scp /Users/hamzaiqbal/grad/learned_activation/satclip/experiments/train.py hiqbal@shell.engr.wustl.edu:/engrfs/project/jacobsn/hiqbal/src/satclip/experiments/
+# Local: commit and push
+cd /Users/hamzaiqbal/grad/learned_activation/satclip
+git add -A && git commit -m "message" && git push origin main
+
+# HPC: pull
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && git pull origin main'
 ```
 
-### Sync Directory
+### Quick File Sync (when needed)
 ```bash
+# Single file
+scp /Users/hamzaiqbal/grad/learned_activation/satclip/experiments/train.py hiqbal@shell.engr.wustl.edu:/engrfs/project/jacobsn/hiqbal/src/satclip/experiments/
+
+# Directory
 rsync -avz --exclude='.git' --exclude='__pycache__' /Users/hamzaiqbal/grad/learned_activation/satclip/experiments/ hiqbal@shell.engr.wustl.edu:/engrfs/project/jacobsn/hiqbal/src/satclip/experiments/
 ```
 
@@ -244,4 +255,4 @@ Based on TTE repo analysis (see local `/Users/hamzaiqbal/grad/learned_activation
 ---
 
 ## Last Updated
-2026-01-24 15:35 CST
+2026-01-24 16:35 CST
