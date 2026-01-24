@@ -152,25 +152,56 @@ ssh hiqbal@shell.engr.wustl.edu 'df -h /engrfs/project/jacobsn/hiqbal'
 
 ---
 
-## Submit Training Jobs
+## Job Execution Workflow
 
-### Test Infrastructure (Quick Verification)
+### Step 1: Sync Code to HPC
 ```bash
+# From local machine - commit and push
+cd /Users/hamzaiqbal/grad/learned_activation/satclip
+git add -A && git commit -m "message" && git push origin main
+
+# Pull on HPC
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && git pull origin main'
+```
+
+### Step 2: Submit Job
+All jobs are submitted from `$SATCLIP_ROOT` directory.
+
+```bash
+# Quick test (verifies infrastructure, ~2 min)
 ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch experiments/scripts/slurm/test_infra.sh'
+
+# Checkpoint test (verifies checkpoints save, ~3 min)
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch experiments/scripts/slurm/test_checkpoint.sh'
+
+# Short training run (50 epochs, ~2 hours)
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch --mem=128G experiments/scripts/slurm/submit_contrastive.sh --activation spline --short'
+
+# Full training run (500 epochs, ~20 hours)
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch --mem=128G experiments/scripts/slurm/submit_contrastive.sh --activation spline'
 ```
 
-### Short Run (50 epochs) for Monitoring
+### Step 3: Monitor Job
 ```bash
-ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch --mem=128G experiments/scripts/slurm/submit_contrastive.sh --activation spline --short --data.num_workers=4'
+# Check if running
+ssh hiqbal@shell.engr.wustl.edu 'squeue -u hiqbal'
+
+# View output (replace JOBID)
+ssh hiqbal@shell.engr.wustl.edu 'tail -50 /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_<JOBID>.out'
+
+# Check for checkpoints
+ssh hiqbal@shell.engr.wustl.edu 'ls -la /engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/*/checkpoints/'
 ```
 
-### Full Run (500 epochs)
-```bash
-ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch --mem=128G experiments/scripts/slurm/submit_contrastive.sh --activation spline --data.num_workers=4'
-```
-
-### Available Activation Types
-- `relu`, `gelu`, `siren`, `spline`
+### submit_contrastive.sh Options
+| Option | Description |
+|--------|-------------|
+| `--activation <type>` | relu, gelu, siren, spline |
+| `--encoding <type>` | sh_l10, sh_l20 |
+| `--vision <type>` | moco_resnet18, moco_resnet50, moco_vit16 |
+| `--short` | 50 epochs (monitoring run) |
+| `--test` | 2 epochs (quick validation) |
+| `--data.num_workers=N` | Override num_workers |
 
 ---
 
