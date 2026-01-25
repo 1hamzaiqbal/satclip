@@ -63,6 +63,7 @@ training:
   max_epochs: 100
   learning_rate: 0.001
   weight_decay: 0.0
+  activation_freeze_epoch: null
 
   # Optimizer
   optimizer: "adamw"  # adam, adamw, sgd

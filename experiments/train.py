@@ -178,6 +178,7 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
         lr_logit_scale = training_config.get("lr_logit_scale", None)
         lr_backbone = training_config.get("lr_backbone", None)
         gather_negatives = training_config.get("gather_negatives", False)
+        activation_freeze_epoch = training_config.get("activation_freeze_epoch", None)
         return ContrastiveLearningModule(
             # Vision encoder
             vision_encoder=model_config.get("vision_encoder", "moco_resnet18"),
@@ -205,6 +206,7 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
             lr_logit_scale=lr_logit_scale,
             lr_backbone=lr_backbone,
             gather_negatives=gather_negatives,
+            activation_freeze_epoch=activation_freeze_epoch,
             # Scheduler
             scheduler=training_config.get("scheduler", None),
             warmup_epochs=training_config.get("warmup_epochs", 10),

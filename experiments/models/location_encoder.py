@@ -202,6 +202,20 @@ class LocationEncoder(nn.Module):
         """Get the positional encoding output dimension."""
         return self.encoding.output_dim
 
+    def freeze_activation_params(self) -> None:
+        """Freeze activation parameters (useful for two-stage training)."""
+        modules = []
+        if self.shared_activation:
+            modules = [self.first_activation, self.shared_activation_module]
+        else:
+            modules = list(self.activations)
+
+        for module in modules:
+            if module is None:
+                continue
+            for param in module.parameters():
+                param.requires_grad = False
+
 
 class RegressionHead(nn.Module):
     """Simple regression head for coordinate-based prediction tasks.

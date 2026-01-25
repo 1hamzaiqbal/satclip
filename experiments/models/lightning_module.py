@@ -207,6 +207,7 @@ class ContrastiveLearningModule(pl.LightningModule):
         lr_logit_scale: Optional[float] = None,
         lr_backbone: Optional[float] = None,
         gather_negatives: bool = False,
+        activation_freeze_epoch: Optional[int] = None,
         # Scheduler config
         scheduler: Optional[str] = None,
         warmup_epochs: int = 10,
@@ -243,6 +244,7 @@ class ContrastiveLearningModule(pl.LightningModule):
             lr_logit_scale: Learning rate for temperature parameter
             lr_backbone: Learning rate for unfrozen vision backbone
             gather_negatives: Use global negatives across DDP ranks
+            activation_freeze_epoch: Epoch to freeze activation parameters
             scheduler: Learning rate scheduler ("cosine", "warmup_cosine", None)
             warmup_epochs: Warmup epochs for scheduler
             min_lr: Minimum learning rate for scheduler
@@ -258,6 +260,8 @@ class ContrastiveLearningModule(pl.LightningModule):
         self.lr_logit_scale = lr_logit_scale or learning_rate
         self.lr_backbone = lr_backbone or learning_rate
         self.gather_negatives = gather_negatives
+        self.activation_freeze_epoch = activation_freeze_epoch
+        self._activation_frozen = False
         self.scheduler_type = scheduler
         self.warmup_epochs = warmup_epochs
         self.min_lr = min_lr
@@ -504,6 +508,14 @@ class ContrastiveLearningModule(pl.LightningModule):
         self.log("logit_scale", metrics["logit_scale"], sync_dist=True)
 
         return loss
+
+    def on_train_epoch_start(self):
+        if self.activation_freeze_epoch is None or self._activation_frozen:
+            return
+        if self.current_epoch >= self.activation_freeze_epoch:
+            self.location_encoder.freeze_activation_params()
+            self._activation_frozen = True
+            self.print(f"Freezing activation parameters at epoch {self.current_epoch}")
 
     def validation_step(self, batch, batch_idx):
         """Validation step."""
