@@ -6,9 +6,9 @@
 #SBATCH --gpus a40:1
 #SBATCH -A engr-lab-jacobsn
 #SBATCH -t 24:00:00
-#SBATCH --mem=64G
+#SBATCH --mem=192G
 #SBATCH -n 1
-#SBATCH -c 8
+#SBATCH -c 16
 
 # =============================================================================
 # SLURM Job Script for SatCLIP Contrastive Training
@@ -59,6 +59,7 @@ ENCODING="sh_l10"
 VISION="moco_resnet18"
 TEST_MODE=false
 SHORT_MODE=false
+BATCH_SIZE=""
 EXTRA_ARGS=""
 
 while [[ $# -gt 0 ]]; do
@@ -66,6 +67,7 @@ while [[ $# -gt 0 ]]; do
         --activation) ACTIVATION="$2"; shift 2 ;;
         --encoding) ENCODING="$2"; shift 2 ;;
         --vision) VISION="$2"; shift 2 ;;
+        --batch_size) BATCH_SIZE="$2"; shift 2 ;;
         --test) TEST_MODE=true; shift ;;
         --short) SHORT_MODE=true; shift ;;
         *) EXTRA_ARGS="$EXTRA_ARGS $1"; shift ;;
@@ -149,10 +151,20 @@ if [ "$TEST_MODE" = true ]; then
     echo "TEST MODE: Running 2 epochs with batch_size=32"
 fi
 
-# Short mode
+# Short mode (with reduced batch size for stability)
 if [ "$SHORT_MODE" = true ]; then
     CMD="$CMD --config experiments/configs/experiments/contrastive_short.yaml"
+    # Default to smaller batch if not specified
+    if [ -z "$BATCH_SIZE" ]; then
+        BATCH_SIZE=256
+    fi
     echo "SHORT MODE: Running 50 epochs for monitoring"
+fi
+
+# Batch size override
+if [ -n "$BATCH_SIZE" ]; then
+    CMD="$CMD --data.batch_size=$BATCH_SIZE"
+    echo "BATCH SIZE: $BATCH_SIZE"
 fi
 
 # Extra args
