@@ -1,0 +1,86 @@
+# SatCLIP-style baseline for contrastive learning
+# ==============================================
+# Uses SatCLIP spherical harmonics + SIREN with a frozen MoCo vision encoder.
+# This provides a clean baseline for activation experiments.
+
+experiment:
+  name: "contrastive_satclip_baseline"
+  description: "SatCLIP baseline with SIREN + SatCLIP SH"
+
+model:
+  # Vision Encoder Configuration
+  vision_encoder: "moco_resnet18"
+  embed_dim: 256
+  freeze_vision: true
+
+  # Location Encoder: Positional Encoding
+  encoding:
+    type: "satclip_sh"
+    legendre_polys: 10
+    harmonics_calculation: "analytic"
+
+  # Location Encoder: Neural Network
+  network:
+    hidden_dim: 256
+    output_dim: 256
+    num_layers: 2
+
+  # Location Encoder: Activation Function
+  activation:
+    type: "siren"
+    w0: 1.0
+    w0_initial: 30.0
+
+  # Contrastive temperature
+  temperature: 0.07
+
+# Data Configuration
+# ------------------
+data:
+  task: "contrastive"
+  dataset: "satclip_multispectral"
+
+  hf_dataset_path: null
+  crop_size: 256
+  pad_to_13_channels: true
+  preprocessed: false
+
+  batch_size: 512
+  num_workers: 8
+  val_split: 0.1
+
+# Training Configuration
+# ----------------------
+training:
+  max_epochs: 500
+  learning_rate: 0.0001
+  weight_decay: 0.01
+
+  accumulate_grad_batches: 16
+
+  scheduler: "warmup_cosine"
+  warmup_epochs: 10
+  min_lr: 0.000001
+
+  gradient_clip_val: 1.0
+
+# Logging Configuration
+# ---------------------
+logging:
+  logger: "tensorboard"
+  save_dir: null
+  name: "contrastive_satclip_baseline"
+  log_every_n_steps: 50
+
+  checkpoint:
+    save_top_k: 3
+    monitor: "val_loss"
+    mode: "min"
+    save_last: true
+
+# Hardware Configuration
+# ----------------------
+hardware:
+  accelerator: "auto"
+  devices: 1
+  precision: 32

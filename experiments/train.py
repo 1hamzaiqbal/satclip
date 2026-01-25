@@ -134,11 +134,19 @@ def get_datamodule(config: Config) -> pl.LightningDataModule:
         dataset_path = data_config.get("hf_dataset_path")
         if not dataset_path:
             dataset_path = Paths.get_dataset_path()
+        vision_encoder = config.model.get("vision_encoder", "")
+        crop_size = data_config.get("crop_size", None)
+        if vision_encoder in ["moco_vit16"]:
+            if crop_size != 224:
+                print(f"Adjusting crop_size to 224 for vision encoder {vision_encoder}")
+            crop_size = 224
+        if crop_size is None:
+            crop_size = 256
         return HFMultispectralDataModule(
             dataset_path=dataset_path,
             batch_size=data_config.get("batch_size", 256),
             num_workers=data_config.get("num_workers", 8),
-            crop_size=data_config.get("crop_size", 224),
+            crop_size=crop_size,
             val_split=data_config.get("val_split", 0.1),
             pad_to_13_channels=data_config.get("pad_to_13_channels", True),
             preprocessed=data_config.get("preprocessed", False),

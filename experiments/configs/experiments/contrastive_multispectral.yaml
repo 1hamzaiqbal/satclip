@@ -42,7 +42,7 @@ model:
 
   # Location Encoder: Positional Encoding
   encoding:
-    type: "spherical_harmonics"
+    type: "satclip_sh"
     legendre_polys: 10  # 100 dimensions
     harmonics_calculation: "analytic"
 
