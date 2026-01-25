@@ -173,6 +173,11 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
 
     # Check if this is a contrastive learning task
     if task == "contrastive":
+        lr_location = training_config.get("lr_location", None)
+        lr_image_proj = training_config.get("lr_image_proj", None)
+        lr_logit_scale = training_config.get("lr_logit_scale", None)
+        lr_backbone = training_config.get("lr_backbone", None)
+        gather_negatives = training_config.get("gather_negatives", False)
         return ContrastiveLearningModule(
             # Vision encoder
             vision_encoder=model_config.get("vision_encoder", "moco_resnet18"),
@@ -195,6 +200,11 @@ def get_model(config: Config, datamodule: pl.LightningDataModule) -> pl.Lightnin
             learning_rate=training_config.get("learning_rate", 1e-4),
             weight_decay=training_config.get("weight_decay", 0.01),
             temperature=model_config.get("temperature", 0.07),
+            lr_location=lr_location,
+            lr_image_proj=lr_image_proj,
+            lr_logit_scale=lr_logit_scale,
+            lr_backbone=lr_backbone,
+            gather_negatives=gather_negatives,
             # Scheduler
             scheduler=training_config.get("scheduler", None),
             warmup_epochs=training_config.get("warmup_epochs", 10),

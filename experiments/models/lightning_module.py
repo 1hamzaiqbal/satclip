@@ -202,6 +202,11 @@ class ContrastiveLearningModule(pl.LightningModule):
         learning_rate: float = 1e-4,
         weight_decay: float = 0.01,
         temperature: float = 0.07,
+        lr_location: Optional[float] = None,
+        lr_image_proj: Optional[float] = None,
+        lr_logit_scale: Optional[float] = None,
+        lr_backbone: Optional[float] = None,
+        gather_negatives: bool = False,
         # Scheduler config
         scheduler: Optional[str] = None,
         warmup_epochs: int = 10,
@@ -233,6 +238,11 @@ class ContrastiveLearningModule(pl.LightningModule):
             learning_rate: Learning rate
             weight_decay: Weight decay
             temperature: Contrastive loss temperature
+            lr_location: Learning rate for location encoder
+            lr_image_proj: Learning rate for image projection head
+            lr_logit_scale: Learning rate for temperature parameter
+            lr_backbone: Learning rate for unfrozen vision backbone
+            gather_negatives: Use global negatives across DDP ranks
             scheduler: Learning rate scheduler ("cosine", "warmup_cosine", None)
             warmup_epochs: Warmup epochs for scheduler
             min_lr: Minimum learning rate for scheduler
@@ -243,6 +253,11 @@ class ContrastiveLearningModule(pl.LightningModule):
         self.learning_rate = learning_rate
         self.weight_decay = weight_decay
         self.temperature = temperature
+        self.lr_location = lr_location or learning_rate
+        self.lr_image_proj = lr_image_proj or learning_rate
+        self.lr_logit_scale = lr_logit_scale or learning_rate
+        self.lr_backbone = lr_backbone or learning_rate
+        self.gather_negatives = gather_negatives
         self.scheduler_type = scheduler
         self.warmup_epochs = warmup_epochs
         self.min_lr = min_lr
@@ -328,6 +343,42 @@ class ContrastiveLearningModule(pl.LightningModule):
             nn.Linear(512, embed_dim),
         )
 
+    def _get_image_proj_params(self) -> list:
+        """Get trainable image projection parameters."""
+        if hasattr(self.vision_encoder, "head"):
+            return [p for p in self.vision_encoder.head.parameters() if p.requires_grad]
+        if hasattr(self.vision_encoder, "fc"):
+            return [p for p in self.vision_encoder.fc.parameters() if p.requires_grad]
+        return []
+
+    def _get_backbone_params(self, exclude: set) -> list:
+        """Get trainable vision backbone parameters, excluding projection head."""
+        params = []
+        for param in self.vision_encoder.parameters():
+            if param.requires_grad and id(param) not in exclude:
+                params.append(param)
+        return params
+
+    def _gather_features(
+        self,
+        image_features: torch.Tensor,
+        location_features: torch.Tensor,
+        sync_grads: bool,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """Gather features across DDP ranks for global negatives."""
+        if not self.gather_negatives or self.trainer.world_size <= 1:
+            return image_features, location_features
+
+        image_all = self.all_gather(image_features, sync_grads=sync_grads)
+        location_all = self.all_gather(location_features, sync_grads=sync_grads)
+
+        if image_all.dim() == 3:
+            image_all = image_all.reshape(-1, image_all.size(-1))
+        if location_all.dim() == 3:
+            location_all = location_all.reshape(-1, location_all.size(-1))
+
+        return image_all, location_all
+
     def encode_image(self, image: torch.Tensor) -> torch.Tensor:
         """Encode image to embedding.
 
@@ -376,25 +427,35 @@ class ContrastiveLearningModule(pl.LightningModule):
         self,
         image_features: torch.Tensor,
         location_features: torch.Tensor,
+        all_image_features: Optional[torch.Tensor] = None,
+        all_location_features: Optional[torch.Tensor] = None,
+        labels_offset: int = 0,
     ) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
         """Compute symmetric contrastive loss (SatCLIP/CLIP loss).
 
         Args:
             image_features: Normalized image embeddings (batch, embed_dim)
             location_features: Normalized location embeddings (batch, embed_dim)
+            all_image_features: Optional global image embeddings for negatives
+            all_location_features: Optional global location embeddings for negatives
+            labels_offset: Offset for labels when using global negatives
 
         Returns:
             Tuple of (loss, metrics_dict)
         """
         logit_scale = self.logit_scale.exp().clamp(max=100)  # Clamp for stability
+        if all_image_features is None:
+            all_image_features = image_features
+        if all_location_features is None:
+            all_location_features = location_features
 
         # Compute similarity matrix
-        logits_per_image = logit_scale * image_features @ location_features.t()
-        logits_per_location = logits_per_image.t()
+        logits_per_image = logit_scale * image_features @ all_location_features.t()
+        logits_per_location = logit_scale * location_features @ all_image_features.t()
 
         # Labels are identity (diagonal should match)
         batch_size = image_features.shape[0]
-        labels = torch.arange(batch_size, device=image_features.device)
+        labels = torch.arange(batch_size, device=image_features.device) + labels_offset
 
         # Symmetric cross entropy
         loss_i = F.cross_entropy(logits_per_image, labels)
@@ -422,7 +483,19 @@ class ContrastiveLearningModule(pl.LightningModule):
         coords = batch["point"].float()
 
         image_features, location_features = self(images, coords)
-        loss, metrics = self.contrastive_loss(image_features, location_features)
+        all_image_features, all_location_features = self._gather_features(
+            image_features, location_features, sync_grads=True
+        )
+        labels_offset = 0
+        if self.gather_negatives and self.trainer.world_size > 1:
+            labels_offset = self.global_rank * image_features.shape[0]
+        loss, metrics = self.contrastive_loss(
+            image_features,
+            location_features,
+            all_image_features=all_image_features,
+            all_location_features=all_location_features,
+            labels_offset=labels_offset,
+        )
 
         # Log metrics
         self.log("train_loss", loss, prog_bar=True, sync_dist=True)
@@ -438,7 +511,19 @@ class ContrastiveLearningModule(pl.LightningModule):
         coords = batch["point"].float()
 
         image_features, location_features = self(images, coords)
-        loss, metrics = self.contrastive_loss(image_features, location_features)
+        all_image_features, all_location_features = self._gather_features(
+            image_features, location_features, sync_grads=False
+        )
+        labels_offset = 0
+        if self.gather_negatives and self.trainer.world_size > 1:
+            labels_offset = self.global_rank * image_features.shape[0]
+        loss, metrics = self.contrastive_loss(
+            image_features,
+            location_features,
+            all_image_features=all_image_features,
+            all_location_features=all_location_features,
+            labels_offset=labels_offset,
+        )
 
         # Log metrics
         self.log("val_loss", loss, prog_bar=True, sync_dist=True)
@@ -449,25 +534,52 @@ class ContrastiveLearningModule(pl.LightningModule):
 
     def configure_optimizers(self):
         """Configure optimizer with differential weight decay and optional scheduler."""
-        # Separate params that should/shouldn't have weight decay
-        decay_params = []
-        no_decay_params = []
+        param_groups = []
 
-        for name, param in self.named_parameters():
-            if not param.requires_grad:
-                continue
-            if param.ndim < 2 or "bias" in name or "logit_scale" in name:
-                no_decay_params.append(param)
-            else:
-                decay_params.append(param)
+        location_params = [p for p in self.location_encoder.parameters() if p.requires_grad]
+        if location_params:
+            param_groups.append(
+                {
+                    "params": location_params,
+                    "lr": self.lr_location,
+                    "weight_decay": self.weight_decay,
+                    "name": "location_encoder",
+                }
+            )
 
-        optimizer = torch.optim.AdamW(
-            [
-                {"params": decay_params, "weight_decay": self.weight_decay},
-                {"params": no_decay_params, "weight_decay": 0.0},
-            ],
-            lr=self.learning_rate,
+        param_groups.append(
+            {
+                "params": [self.logit_scale],
+                "lr": self.lr_logit_scale,
+                "weight_decay": 0.0,
+                "name": "logit_scale",
+            }
         )
+
+        proj_params = self._get_image_proj_params()
+        if proj_params:
+            param_groups.append(
+                {
+                    "params": proj_params,
+                    "lr": self.lr_image_proj,
+                    "weight_decay": 0.0,
+                    "name": "image_proj",
+                }
+            )
+
+        excluded = {id(p) for p in proj_params}
+        backbone_params = self._get_backbone_params(excluded)
+        if backbone_params:
+            param_groups.append(
+                {
+                    "params": backbone_params,
+                    "lr": self.lr_backbone,
+                    "weight_decay": self.weight_decay,
+                    "name": "vision_backbone",
+                }
+            )
+
+        optimizer = torch.optim.AdamW(param_groups)
 
         if self.scheduler_type is None:
             return optimizer
