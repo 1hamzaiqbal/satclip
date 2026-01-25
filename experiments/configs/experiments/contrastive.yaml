@@ -44,7 +44,7 @@ model:
   # -------------------------------------
   # Transforms (lon, lat) coordinates into features before the neural network
   encoding:
-    type: "spherical_harmonics"  # Options: spherical_harmonics, sh, raw, rff, cartesian3d
+    type: "satclip_sh"  # Options: satclip_sh, sh_v2, spherical_harmonics, sh, raw, rff, cartesian3d
     legendre_polys: 10  # For SH: controls resolution (10=100 dims, 20=400, 40=1600)
     harmonics_calculation: "analytic"  # analytic is faster, closed-form is more general
 
@@ -78,11 +78,15 @@ model:
 # ------------------
 data:
   task: "contrastive"  # Triggers contrastive learning mode
-  dataset: "satclip"   # Uses HuggingFace dataset: davanstrien/satclip (S2-100K)
+  dataset: "satclip_multispectral"   # Uses HF Arrow dataset (S2-100K preprocessed)
 
   batch_size: 512      # Paper uses 8k effective batch size via accumulation
   num_workers: 8
   val_split: 0.1       # 10% for validation
+
+  crop_size: 256
+  pad_to_13_channels: true
+  preprocessed: false
 
   # Optional: specify cache directory for downloaded data
   cache_dir: null  # e.g., "/scratch/data/satclip"

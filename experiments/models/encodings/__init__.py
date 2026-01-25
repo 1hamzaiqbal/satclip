@@ -7,13 +7,14 @@ Modular positional encodings for geographic coordinates:
 - Cartesian 3D (unit sphere projection)
 """
 
-from .spherical_harmonics import SphericalHarmonicsEncoding
+from .spherical_harmonics import SphericalHarmonicsEncoding, SphericalHarmonicsEncodingV2
 from .raw import RawCoordinateEncoding
 from .rff_encoding import RFFEncoding
 from .cartesian import Cartesian3DEncoding
 
 __all__ = [
     "SphericalHarmonicsEncoding",
+    "SphericalHarmonicsEncodingV2",
     "RawCoordinateEncoding",
     "RFFEncoding",
     "Cartesian3DEncoding",
@@ -23,6 +24,8 @@ __all__ = [
 ENCODING_REGISTRY = {
     "spherical_harmonics": SphericalHarmonicsEncoding,
     "sh": SphericalHarmonicsEncoding,  # alias
+    "satclip_sh": SphericalHarmonicsEncodingV2,
+    "sh_v2": SphericalHarmonicsEncodingV2,
     "raw": RawCoordinateEncoding,
     "rff": RFFEncoding,
     "cartesian3d": Cartesian3DEncoding,

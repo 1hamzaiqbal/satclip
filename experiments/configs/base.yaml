@@ -25,6 +25,7 @@ model:
   # Activation function
   activation:
     type: "relu"  # relu, siren, spline, rff
+    shared: true
     # SIREN-specific
     w0: 1.0
     w0_initial: 30.0

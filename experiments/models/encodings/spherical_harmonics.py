@@ -135,14 +135,13 @@ class SphericalHarmonicsEncodingV2(nn.Module):
         super().__init__()
 
         try:
-            # Try to import the original satclip implementation
+            # Try to import the original SatCLIP implementation
             import sys
-            import os
+            from pathlib import Path
 
-            # Add satclip to path if needed
-            satclip_path = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
-            if satclip_path not in sys.path:
-                sys.path.insert(0, satclip_path)
+            repo_root = Path(__file__).resolve().parents[3]
+            if str(repo_root) not in sys.path:
+                sys.path.insert(0, str(repo_root))
 
             from satclip.positional_encoding import SphericalHarmonics
 

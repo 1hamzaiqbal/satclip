@@ -3,6 +3,6 @@
 
 model:
   encoding:
-    type: "spherical_harmonics"
+    type: "satclip_sh"
     legendre_polys: 10
     harmonics_calculation: "analytic"

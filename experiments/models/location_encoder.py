@@ -7,6 +7,7 @@ The LocationEncoder combines:
 This is the core component for learning location embeddings.
 """
 
+import math
 import torch
 import torch.nn as nn
 from typing import Optional, Dict, Any, Literal
@@ -73,24 +74,42 @@ class LocationEncoder(nn.Module):
         input_dim = self.encoding.output_dim
 
         # Initialize activation config
-        activation_config = activation_config or {}
+        activation_config = (activation_config or {}).copy()
+        self.shared_activation = bool(activation_config.pop("shared", False))
+        self.activation_config = activation_config
 
         # Build network layers
         self.layers = nn.ModuleList()
         self.activations = nn.ModuleList()
+        self.first_activation = None
+        self.shared_activation_module = None
 
         # Input layer
         self.layers.append(nn.Linear(input_dim, hidden_dim, bias=use_bias))
-        self.activations.append(
-            self._make_activation(activation_type, activation_config, is_first=True)
-        )
+        if self.shared_activation:
+            self.first_activation = self._make_activation(
+                activation_type, activation_config, is_first=True
+            )
+            if num_layers > 1:
+                self.shared_activation_module = self._make_activation(
+                    activation_type, activation_config, is_first=False
+                )
+            else:
+                self.shared_activation_module = self.first_activation
+        else:
+            self.activations.append(
+                self._make_activation(activation_type, activation_config, is_first=True)
+            )
 
         # Hidden layers
         for i in range(num_layers - 1):
             self.layers.append(nn.Linear(hidden_dim, hidden_dim, bias=use_bias))
-            self.activations.append(
-                self._make_activation(activation_type, activation_config, is_first=False)
-            )
+            if not self.shared_activation:
+                self.activations.append(
+                    self._make_activation(
+                        activation_type, activation_config, is_first=False
+                    )
+                )
 
         # Output layer (no activation)
         self.output_layer = nn.Linear(hidden_dim, output_dim, bias=use_bias)
@@ -120,6 +139,25 @@ class LocationEncoder(nn.Module):
 
     def _init_weights(self):
         """Initialize network weights."""
+        if self.activation_type == "siren":
+            w0 = float(self.activation_config.get("w0", 1.0))
+            c = float(self.activation_config.get("c", 6.0))
+            for idx, layer in enumerate(self.layers):
+                if not isinstance(layer, nn.Linear):
+                    continue
+                in_features = layer.weight.shape[1]
+                w_std = (1.0 / in_features) if idx == 0 else (math.sqrt(c / in_features) / w0)
+                nn.init.uniform_(layer.weight, -w_std, w_std)
+                if layer.bias is not None:
+                    nn.init.uniform_(layer.bias, -w_std, w_std)
+
+            out_in_features = self.output_layer.weight.shape[1]
+            out_w_std = math.sqrt(c / out_in_features)
+            nn.init.uniform_(self.output_layer.weight, -out_w_std, out_w_std)
+            if self.output_layer.bias is not None:
+                nn.init.uniform_(self.output_layer.bias, -out_w_std, out_w_std)
+            return
+
         for layer in self.layers:
             if isinstance(layer, nn.Linear):
                 nn.init.kaiming_normal_(layer.weight)
@@ -143,9 +181,15 @@ class LocationEncoder(nn.Module):
         x = self.encoding(coords)
 
         # Apply network layers
-        for layer, activation in zip(self.layers, self.activations):
+        for idx, layer in enumerate(self.layers):
             x = layer(x)
-            x = activation(x)
+            if self.shared_activation:
+                if idx == 0:
+                    x = self.first_activation(x)
+                else:
+                    x = self.shared_activation_module(x)
+            else:
+                x = self.activations[idx](x)
             if self.dropout is not None:
                 x = self.dropout(x)
 
