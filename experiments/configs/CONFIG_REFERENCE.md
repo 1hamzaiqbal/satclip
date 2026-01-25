@@ -43,7 +43,12 @@ python -m experiments.train --config ... \
 |-----|------|---------|-------------|
 | type | string | "spherical_harmonics" | Encoding type |
 | legendre_polys | int | 10 | L value for SH (gives 2L+1 coeffs) |
-| harmonics_calculation | string | "analytic" | "analytic" or "recursive" |
+| harmonics_calculation | string | "analytic" | "analytic" or "closed-form" |
+
+Encoding type options:
+- `satclip_sh` or `sh_v2`: SatCLIP positional encoding (parity with OG SatCLIP)
+- `spherical_harmonics` or `sh`: Simplified SH encoding
+- `raw`, `rff`, `cartesian3d`
 
 ### model.network (MLP)
 
@@ -58,6 +63,7 @@ python -m experiments.train --config ... \
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | type | string | "siren" | Activation function |
+| shared | bool | true | Share one activation across all layers |
 
 **For type="relu"**: No additional options.
 
@@ -74,7 +80,7 @@ python -m experiments.train --config ... \
 |-----|------|---------|-------------|
 | n_knots | int | 15 | Number of B-spline knots |
 | input_range | [float, float] | [-3.0, 3.0] | Input range for knots |
-| init | string | "relu" | Initialization: "relu", "gelu", "identity" |
+| init | string | "relu" | Initialization: "relu", "linear", "zero", "tanh", "gelu" |
 | learnable_positions | bool | false | Whether knot positions are learnable |
 
 ### model (Vision Encoder)
@@ -118,11 +124,17 @@ Vision encoder options:
 | max_epochs | int | 500 | Maximum epochs |
 | learning_rate | float | 0.0001 | Learning rate |
 | weight_decay | float | 0.01 | Weight decay |
+| lr_location | float | null | LR for location encoder (defaults to learning_rate) |
+| lr_image_proj | float | null | LR for image projection head (defaults to learning_rate) |
+| lr_logit_scale | float | null | LR for temperature parameter (defaults to learning_rate) |
+| lr_backbone | float | null | LR for unfrozen vision backbone (defaults to learning_rate) |
 | accumulate_grad_batches | int | 4 | Gradient accumulation |
 | gradient_clip_val | float | 1.0 | Gradient clipping |
 | scheduler | string | "warmup_cosine" | LR scheduler |
 | warmup_epochs | int | 10 | Warmup epochs |
 | min_lr | float | 1e-6 | Minimum LR |
+| gather_negatives | bool | false | Use global negatives across DDP ranks |
+| activation_freeze_epoch | int | null | Freeze activation params at epoch N (optional) |
 
 ### training.early_stopping
 

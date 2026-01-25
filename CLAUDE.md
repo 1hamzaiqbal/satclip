@@ -8,6 +8,15 @@ Last verified: 2026-01-24 16:32 CST (Job 18479)
 - **Data loading**: WORKING (HF dataset loads correctly)
 - **EpochLogger**: WORKING (prints `Epoch X/Y | Val Loss: Z.ZZZZ | Time: Xm Ys`)
 
+### Current Training Setup (2026-01-24 updates)
+- **SatCLIP SH parity**: use `model.encoding.type: satclip_sh` (or `sh_v2`) for OG SatCLIP positional encoding.
+- **SIREN baseline fixed**: proper SIREN weight init is now applied when `activation.type: siren`.
+- **Shared activations**: `model.activation.shared: true` shares one activation across layers (paper default).
+- **HF multispectral default**: contrastive configs default to `dataset: satclip_multispectral` for /10000 normalization + B10 padding.
+- **ViT crop size**: `moco_vit16` auto-forces `crop_size=224` in HF multispectral datamodule.
+- **Optional DDP negatives**: `training.gather_negatives: true` enables global negatives across ranks.
+- **Optional activation freeze**: `training.activation_freeze_epoch: N` freezes activation params after epoch N.
+
 ### Checkpoint Test Results (Job 18479)
 ```
 5 epochs with 5 train batches each, checkpoints every 2 epochs:
@@ -168,6 +177,9 @@ ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip &
 All jobs are submitted from `$SATCLIP_ROOT` directory.
 
 ```bash
+# Baseline SatCLIP-style run (SIREN + SatCLIP SH)
+ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch experiments/scripts/slurm/submit_contrastive.sh --config experiments/configs/experiments/contrastive_satclip_baseline.yaml'
+
 # Quick test (verifies infrastructure, ~2 min)
 ssh hiqbal@shell.engr.wustl.edu 'cd /engrfs/project/jacobsn/hiqbal/src/satclip && sbatch experiments/scripts/slurm/test_infra.sh'
 
