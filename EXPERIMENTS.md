@@ -125,6 +125,15 @@ After training completes:
 - Added modular path management with env.sh and paths.py
 - Test jobs 18475, 18479, 18490 all passed
 
+### 2026-01-24 (Caveats for runs started before baseline fixes)
+- SH encoding likely used simplified `spherical_harmonics` instead of SatCLIP parity (`satclip_sh`).
+- SIREN baseline did not use proper SIREN weight initialization.
+- Contrastive runs using `dataset: satclip` lacked /10000 normalization and optional B10 padding (MoCo mismatch).
+- Activations were not shared across layers by default (paper baseline expects shared).
+- ViT runs may have used non-224 crops unless explicitly set.
+- DDP runs used local negatives only (no global all_gather).
+- These runs are not directly comparable to the corrected baselines; treat as exploratory.
+
 ---
 
 ## References
