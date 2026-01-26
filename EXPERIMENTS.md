@@ -54,7 +54,7 @@ model:
 | 18509 | 2026-01-25 | SIREN baseline (short) | 50 | COMPLETED | Phase 2.1 - val_loss=2.5026 |
 | 18523 | 2026-01-25 | Spline (short) | 50 | COMPLETED | Phase 2.2 - val_loss=2.4717 |
 | 18594 | 2026-01-25 | Spline (full) | 312/500 | TIMEOUT | Phase 3.1 - best val_loss=2.8870 @ epoch 99 |
-| 18829 | 2026-01-26 | Raw + per-layer spline (short) | 50 | RUNNING | Phase 5.1 - raw encoding, shared=false |
+| 18829 | 2026-01-26 | Raw + per-layer spline (short) | 50 | COMPLETED | Phase 5.1 - val_loss=3.0131 @ epoch 49 |
 
 ### Job 18498: Spline Short Run (Pre-Baseline-Fix)
 
@@ -257,12 +257,33 @@ sbatch experiments/scripts/slurm/submit_contrastive.sh \
 
 **Job ID**: 18829
 **Run Directory**: `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260126_141110/`
-**Status**: RUNNING (started 2026-01-26 14:11 CST)
+**Status**: COMPLETED (2026-01-26 16:24 CST)
 
-**Expected Outcomes**:
-- Worse performance than SH+spline (less positional information)
-- More diverse spline shapes across layers (not shared)
-- Interesting to see how splines compensate for lack of SH features
+**Results**:
+- **Best Val Loss**: 3.0131 (epoch 49)
+- **Training Time**: ~2m 38s/epoch, ~2h 15min total
+- **Loss Trajectory**: 5.63 → 3.01
+
+**Saved Checkpoints**:
+```
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260126_141110/checkpoints/
+  - epoch=29-val_loss=3.0724.ckpt
+  - epoch=39-val_loss=3.0216.ckpt
+  - epoch=49-val_loss=3.0131.ckpt (BEST)
+  - last.ckpt
+```
+
+**Key Findings**:
+1. **Worse than SH encoding** as expected: 3.0131 vs 2.4717 (+22% loss)
+2. **Still learns**: Loss dropped from 5.63 → 3.01 (46% reduction)
+3. **Slower convergence**: Best at epoch 49 vs epoch 39 for SH+spline
+
+**Comparison to Phase 2**:
+| Config | Encoding | Activation | Best Val Loss | Best Epoch |
+|--------|----------|------------|---------------|------------|
+| Phase 2.1 SIREN | satclip_sh (100d) | SIREN, shared | 2.5026 | 49 |
+| Phase 2.2 Spline | satclip_sh (100d) | spline, shared | 2.4717 | 39 |
+| **Phase 5.1 Raw** | **raw (2d)** | **spline, per-layer** | **3.0131** | 49 |
 
 ---
 
