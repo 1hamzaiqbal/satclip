@@ -54,6 +54,7 @@ model:
 | 18509 | 2026-01-25 | SIREN baseline (short) | 50 | COMPLETED | Phase 2.1 - val_loss=2.5026 |
 | 18523 | 2026-01-25 | Spline (short) | 50 | COMPLETED | Phase 2.2 - val_loss=2.4717 |
 | 18594 | 2026-01-25 | Spline (full) | 312/500 | TIMEOUT | Phase 3.1 - best val_loss=2.8870 @ epoch 99 |
+| 18829 | 2026-01-26 | Raw + per-layer spline (short) | 50 | RUNNING | Phase 5.1 - raw encoding, shared=false |
 
 ### Job 18498: Spline Short Run (Pre-Baseline-Fix)
 
@@ -244,7 +245,7 @@ sbatch experiments/scripts/slurm/submit_contrastive.sh --activation spline
 | Batch Size | 256 (effective 1024 with accum=4) |
 | Max Epochs | 50 (short run first) |
 
-### Experiment 5.1: Raw + Per-Layer Splines (Short)
+### Experiment 5.1: Raw + Per-Layer Splines (Short) - Job 18829
 ```bash
 # Command
 sbatch experiments/scripts/slurm/submit_contrastive.sh \
@@ -253,6 +254,10 @@ sbatch experiments/scripts/slurm/submit_contrastive.sh \
     --model.encoding.type=raw \
     --model.activation.shared=false
 ```
+
+**Job ID**: 18829
+**Run Directory**: `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260126_141110/`
+**Status**: RUNNING (started 2026-01-26 14:11 CST)
 
 **Expected Outcomes**:
 - Worse performance than SH+spline (less positional information)
