@@ -27,8 +27,11 @@ from scipy.special import softmax
 # Configuration
 # ==============================================================================
 
-# Default data directory - update this to your local path
-DEFAULT_DATA_DIR = "/projects/bdbk/shared/range_eval_data"
+# Default data directory - uses environment variable or HPC path
+DEFAULT_DATA_DIR = os.environ.get(
+    "SATCLIP_RANGE_DATA",
+    "/engrfs/project/jacobsn/hiqbal/data_raw/datasets/eval_range_datasets"
+)
 
 # Random seed for reproducibility (consistent with original RANGE eval)
 RANDOM_SEED = 42
@@ -657,7 +660,8 @@ def load_location_encoder(checkpoint_path: str, device: str = 'cuda'):
     """
     from experiments.models.location_encoder import LocationEncoder
 
-    checkpoint = torch.load(checkpoint_path, map_location=device)
+    # Use weights_only=False for Lightning checkpoints (contains numpy scalars)
+    checkpoint = torch.load(checkpoint_path, map_location=device, weights_only=False)
 
     # Check if this is a Lightning checkpoint (has 'hyper_parameters' or 'state_dict')
     if isinstance(checkpoint, dict) and 'hyper_parameters' in checkpoint:

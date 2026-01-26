@@ -1,0 +1,31 @@
+activation_config:
+  init: relu
+  input_range:
+  - -3.0
+  - 3.0
+  n_features: 256
+  n_knots: 15
+  sigma: 10.0
+  w0: 1.0
+  w0_initial: 30.0
+activation_type: relu
+batch_size: 256
+data_path: null
+dataset_task: elevation
+encoding_config:
+  harmonics_calculation: analytic
+  legendre_polys: 10
+encoding_type: spherical_harmonics
+hidden_dim: 256
+learning_rate: 0.001
+n_samples: 500
+num_classes: 1
+num_layers: 3
+num_workers: 4
+region: null
+seed: 42
+target_mean: -1864.595947265625
+target_std: 2563.06103515625
+task: regression
+test_fraction: 0.3
+weight_decay: 0.0

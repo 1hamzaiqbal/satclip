@@ -2,13 +2,13 @@
 
 ## VERIFIED: Infrastructure Working
 
-Last verified: 2026-01-24 16:32 CST (Job 18479)
+Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 - **Checkpoints**: WORKING (saves to explicit `checkpoints/` subdirectory)
 - **TensorBoard**: WORKING
 - **Data loading**: WORKING (HF dataset loads correctly)
 - **EpochLogger**: WORKING (prints `Epoch X/Y | Val Loss: Z.ZZZZ | Time: Xm Ys`)
 
-### Current Training Setup (2026-01-24 updates)
+### Current Training Setup
 - **SatCLIP SH parity**: use `model.encoding.type: satclip_sh` (or `sh_v2`) for OG SatCLIP positional encoding.
 - **SIREN baseline fixed**: proper SIREN weight init is now applied when `activation.type: siren`.
 - **Shared activations**: `model.activation.shared: true` shares one activation across layers (paper default).
@@ -17,18 +17,41 @@ Last verified: 2026-01-24 16:32 CST (Job 18479)
 - **Optional DDP negatives**: `training.gather_negatives: true` enables global negatives across ranks.
 - **Optional activation freeze**: `training.activation_freeze_epoch: N` freezes activation params after epoch N.
 
-### Checkpoint Test Results (Job 18479)
+---
+
+## Experiment Results Summary (2026-01-26)
+
+### Phase 2: Short Runs (50 epochs) - COMPLETED
+| Activation | Job ID | Best Val Loss | Best Epoch |
+|------------|--------|---------------|------------|
+| SIREN | 18509 | 2.5026 | 49 |
+| **Spline** | 18523 | **2.4717** | 39 |
+
+**Winner**: Spline (-1.23% loss, -10 epochs to converge)
+
+### Phase 3: Full Training (312/500 epochs) - COMPLETED
+| Activation | Job ID | Best Val Loss | Best Epoch | Status |
+|------------|--------|---------------|------------|--------|
+| Spline | 18594 | 2.8870 | 99 | TIMEOUT (24h limit) |
+
+**Key Finding**: Training converged early (~epoch 100), diminishing returns after.
+
+### Best Checkpoints
 ```
-5 epochs with 5 train batches each, checkpoints every 2 epochs:
-- epoch=1-val_loss=3.4388.ckpt (46.15 MB)
-- epoch=3-val_loss=3.3412.ckpt (46.16 MB)
-- last.ckpt (46.16 MB)
+# Phase 2 Spline (short)
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260125_014617/checkpoints/
+
+# Phase 3 Spline (full - BEST)
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260125_103146/checkpoints/
+  - epoch=99-val_loss=2.8870.ckpt  (BEST)
+  - epoch=109-val_loss=2.8949.ckpt
+  - epoch=119-val_loss=2.8937.ckpt
+  - last.ckpt (epoch 312)
 ```
 
-### Estimated Training Speed
-- With full dataset (84K samples), batch 512, 4x accumulation: ~41 steps/epoch
-- Each epoch: ~2-3 minutes on A40 with mixed precision
-- Epoch 10 checkpoint appears around 25-30 min into training
+### Training Speed
+- Short runs (batch=256): ~2.5 min/epoch
+- Full runs (batch=512): ~4-4.5 min/epoch
 
 ---
 
@@ -336,4 +359,4 @@ Based on TTE repo analysis (see local `/Users/hamzaiqbal/grad/learned_activation
 ---
 
 ## Last Updated
-2026-01-24 16:35 CST
+2026-01-26 14:00 CST
