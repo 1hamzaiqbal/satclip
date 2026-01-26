@@ -28,16 +28,29 @@ set -e
 # Load Environment
 # =============================================================================
 
-# Find and source env.sh (search up from script location)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Find and source env.sh (search multiple locations)
 ENV_FILE=""
 
-for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/.." "$SCRIPT_DIR/../.." "$SCRIPT_DIR/../../.."; do
-    if [ -f "$dir/env.sh" ]; then
-        ENV_FILE="$dir/env.sh"
-        break
-    fi
-done
+# Try 1: Known HPC path (most reliable for SLURM jobs)
+if [ -f "/engrfs/project/jacobsn/hiqbal/src/satclip/env.sh" ]; then
+    ENV_FILE="/engrfs/project/jacobsn/hiqbal/src/satclip/env.sh"
+fi
+
+# Try 2: Search from script location (for local testing)
+if [ -z "$ENV_FILE" ]; then
+    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" 2>/dev/null && pwd)"
+    for dir in "$SCRIPT_DIR" "$SCRIPT_DIR/.." "$SCRIPT_DIR/../.." "$SCRIPT_DIR/../../.."; do
+        if [ -f "$dir/env.sh" ]; then
+            ENV_FILE="$dir/env.sh"
+            break
+        fi
+    done
+fi
+
+# Try 3: Current working directory
+if [ -z "$ENV_FILE" ] && [ -f "./env.sh" ]; then
+    ENV_FILE="./env.sh"
+fi
 
 if [ -n "$ENV_FILE" ]; then
     source "$ENV_FILE"
