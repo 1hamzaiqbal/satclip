@@ -482,7 +482,8 @@ def extract_embeddings(data_loader, model, device='cuda'):
     with torch.no_grad():
         for batch in tqdm(data_loader, desc="Extracting embeddings"):
             coords, labels = batch
-            coords = coords.to(device)
+            # Convert to float32 and move to device (datasets return float64)
+            coords = coords.float().to(device)
 
             # Handle models that may return numpy directly
             try:
