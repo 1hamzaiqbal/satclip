@@ -424,9 +424,64 @@ sbatch experiments/scripts/slurm/submit_eval_range.sh \
 
 ---
 
+## Phase 7: Learnable RFF + Spline
+
+### Experimental Design
+
+**Objective**: Test if learnable Random Fourier Features (RFF) can match or exceed spherical harmonics (SH) for location encoding.
+
+**Hypothesis**: By making the RFF frequency matrix learnable, the network can discover task-optimal spatial frequencies, potentially achieving similar or better performance than hand-crafted SH bases with fewer dimensions.
+
+**Key Innovation**:
+- Standard RFF: `φ(x) = [sin(2πBx), cos(2πBx)]` where **B is fixed** (random Gaussian)
+- Learnable RFF: Same formula, but **B is a trainable parameter**
+
+**Why This Complements Existing Experiments**:
+| Phase | Encoding | Activation | What We Learned |
+|-------|----------|------------|-----------------|
+| 2.1-2.2 | SH (100d, fixed) | SIREN/Spline | Spline > SIREN |
+| 5.1 | Raw (2d) | Spline (per-layer) | Too simple, 22% worse |
+| **7.1** | **Learnable RFF (256d)** | **Spline** | Can learned frequencies compete? |
+
+**Configuration**:
+| Parameter | Value |
+|-----------|-------|
+| Encoding | `learnable_rff` (256 dims, learnable B matrix) |
+| Activation | `spline` (shared, k=15, init=relu) |
+| Vision Encoder | `moco_resnet18` (frozen) |
+| Hidden/Output Dim | 512 |
+| Network Layers | 2 |
+| Batch Size | 256 (effective 1024 with accum=4) |
+| Max Epochs | 50 (short run) |
+
+### Experiment 7.1: Learnable RFF + Spline (Short)
+
+```bash
+# Command
+sbatch experiments/scripts/slurm/submit_contrastive.sh \
+    --encoding learnable_rff \
+    --activation spline \
+    --short
+```
+
+**Status**: PLANNED
+
+**Expected Outcomes**:
+1. If val_loss < 2.47: Learnable RFF + Spline beats SH + Spline
+2. If val_loss ~ 2.47-2.60: Competitive, worth exploring further
+3. If val_loss > 3.0: RFF fundamentally worse for this task
+
+### Future Experiments (if 7.1 promising)
+- **7.2**: Multi-scale learnable RFF (combine multiple sigma initializations)
+- **7.3**: Learnable RFF + SIREN (compare activation effects)
+- **7.4**: Higher dimension learnable RFF (512d, 1024d)
+
+---
+
 ## References
 
 - Original SatCLIP paper: [Klemmer et al., 2023]
 - TTE (Time-To-Event) repo: Pattern reference for PyTorch Lightning
 - B-spline theory: [de Boor, 1978]
 - RANGE benchmark: [Mai et al., 2023]
+- Random Fourier Features: [Rahimi & Recht, 2007]

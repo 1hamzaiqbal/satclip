@@ -1,0 +1,17 @@
+# Learnable RFF coordinate encoding
+# Random Fourier Features with learnable frequency matrix
+#
+# Unlike standard RFF where frequencies are fixed random,
+# this version learns the optimal frequencies for the task.
+#
+# Use with spline activation for full flexibility:
+#   sbatch submit_contrastive.sh --encoding learnable_rff --activation spline --short
+
+model:
+  encoding:
+    type: "learnable_rff"
+    n_features: 256          # Output dimension (128 sin + 128 cos)
+    sigma: 10.0              # Initial scale for frequencies (before learning)
+    normalize_input: true    # Normalize lon/lat to [-1, 1]
+    seed: 42                 # Reproducible initialization
+    learnable_scale: false   # Keep scale fixed, only learn B matrix

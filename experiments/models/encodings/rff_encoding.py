@@ -100,6 +100,102 @@ class RFFEncoding(nn.Module):
         )
 
 
+class LearnableRFFEncoding(nn.Module):
+    """Learnable Random Fourier Features encoding.
+
+    Unlike standard RFF where the frequency matrix B is fixed (random),
+    this version makes B a learnable parameter. The network can learn
+    which spatial frequencies are most useful for the task.
+
+    This is especially useful when:
+    - The optimal frequency scale is unknown
+    - Different frequencies matter for different spatial patterns
+    - Combined with learnable activations (like splines) for full flexibility
+    """
+
+    def __init__(
+        self,
+        input_dim: int = 2,
+        n_features: int = 256,
+        sigma: float = 10.0,
+        normalize_input: bool = True,
+        coord_scale: Optional[torch.Tensor] = None,
+        seed: Optional[int] = None,
+        learnable_scale: bool = False,
+        **kwargs,
+    ):
+        """Initialize learnable RFF encoding.
+
+        Args:
+            input_dim: Input dimension (2 for lon/lat)
+            n_features: Number of output features
+            sigma: Initial scale for random frequencies (before learning)
+            normalize_input: Whether to normalize input coordinates
+            coord_scale: Scale for normalization (default: [180, 90] for lon/lat)
+            seed: Random seed for initial frequency matrix
+            learnable_scale: If True, also learn a global scale factor
+            **kwargs: Ignored
+        """
+        super().__init__()
+        self.input_dim = input_dim
+        self.n_features = n_features
+        self.sigma = sigma
+        self.normalize_input = normalize_input
+        self.embedding_dim = n_features
+        self.learnable_scale = learnable_scale
+
+        if coord_scale is None:
+            coord_scale = torch.tensor([180.0, 90.0])
+        self.register_buffer("coord_scale", coord_scale)
+
+        # Generate initial random frequency matrix
+        if seed is not None:
+            torch.manual_seed(seed)
+
+        # Key difference: B is a Parameter, not a buffer
+        B_init = torch.randn(input_dim, n_features // 2) * sigma
+        self.B = nn.Parameter(B_init)
+
+        # Optional learnable scale factor
+        if learnable_scale:
+            self.scale = nn.Parameter(torch.ones(1))
+        else:
+            self.register_buffer("scale", torch.ones(1))
+
+    def forward(self, lonlat: torch.Tensor) -> torch.Tensor:
+        """Encode coordinates using learnable RFF.
+
+        Args:
+            lonlat: Tensor of shape (batch, 2) with (lon, lat)
+
+        Returns:
+            RFF features of shape (batch, n_features)
+        """
+        x = lonlat
+
+        if self.normalize_input:
+            x = x / self.coord_scale.to(x.device)
+
+        # Project: (batch, input_dim) @ (input_dim, n_features/2)
+        x_proj = 2 * math.pi * self.scale * (x @ self.B)
+
+        # Concatenate sin and cos
+        return torch.cat([torch.sin(x_proj), torch.cos(x_proj)], dim=-1)
+
+    @property
+    def output_dim(self) -> int:
+        """Output dimension of encoding."""
+        return self.embedding_dim
+
+    def extra_repr(self) -> str:
+        return (
+            f"input_dim={self.input_dim}, "
+            f"n_features={self.n_features}, "
+            f"sigma={self.sigma}, "
+            f"learnable=True"
+        )
+
+
 class MultiScaleRFFEncoding(nn.Module):
     """Multi-scale RFF encoding with multiple sigma values.
 

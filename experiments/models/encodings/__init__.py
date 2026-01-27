@@ -9,7 +9,7 @@ Modular positional encodings for geographic coordinates:
 
 from .spherical_harmonics import SphericalHarmonicsEncoding, SphericalHarmonicsEncodingV2
 from .raw import RawCoordinateEncoding
-from .rff_encoding import RFFEncoding
+from .rff_encoding import RFFEncoding, LearnableRFFEncoding
 from .cartesian import Cartesian3DEncoding
 
 __all__ = [
@@ -17,6 +17,7 @@ __all__ = [
     "SphericalHarmonicsEncodingV2",
     "RawCoordinateEncoding",
     "RFFEncoding",
+    "LearnableRFFEncoding",
     "Cartesian3DEncoding",
 ]
 
@@ -28,6 +29,7 @@ ENCODING_REGISTRY = {
     "sh_v2": SphericalHarmonicsEncodingV2,
     "raw": RawCoordinateEncoding,
     "rff": RFFEncoding,
+    "learnable_rff": LearnableRFFEncoding,
     "cartesian3d": Cartesian3DEncoding,
 }
 
