@@ -16,8 +16,12 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
+import torch.multiprocessing
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 from tqdm import tqdm
+
+# Set sharing strategy to avoid "Too many open files" error
+torch.multiprocessing.set_sharing_strategy('file_system')
 from sklearn.linear_model import RidgeCV, RidgeClassifierCV
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import top_k_accuracy_score, make_scorer
@@ -316,7 +320,7 @@ def get_checker_data(n_samples, n_support, n_classes, seed=0, grid=False):
         lonlats = torch.from_numpy(np.stack([lons_seed, lats_seed])).T
         labels_out = torch.from_numpy(labels_seed)
 
-    return lonlats, torch.zeros_like(labels_out), labels_out
+    return lonlats, labels_out
 
 
 class CheckerboardDataset:
