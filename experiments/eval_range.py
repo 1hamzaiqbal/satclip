@@ -12,6 +12,7 @@ Key parameters are kept consistent with the original RANGE eval for fair compari
 """
 
 import os
+import gc
 import argparse
 import numpy as np
 import pandas as pd
@@ -20,8 +21,9 @@ import torch.multiprocessing
 from torch.utils.data import Dataset, DataLoader, TensorDataset, random_split
 from tqdm import tqdm
 
-# Set sharing strategy to avoid "Too many open files" error
+# Set sharing strategy BEFORE any DataLoader creation to avoid "Too many open files"
 torch.multiprocessing.set_sharing_strategy('file_system')
+
 from sklearn.linear_model import RidgeCV, RidgeClassifierCV
 from sklearn.preprocessing import MinMaxScaler
 from sklearn.metrics import top_k_accuracy_score, make_scorer
@@ -296,7 +298,12 @@ def cart2sph(x, y, z):
 
 
 def get_checker_data(n_samples, n_support, n_classes, seed=0, grid=False):
-    """Generate checkerboard pattern data on a sphere."""
+    """Generate checkerboard pattern data on a sphere.
+
+    Returns:
+        lonlats: FloatTensor of shape (n_samples, 2) with (lon, lat) coordinates
+        labels: LongTensor of shape (n_samples,) with class labels
+    """
     lons, lats, labels = generate_fibonacci_lattice(n_support, n_classes=n_classes)
 
     if grid:
@@ -305,8 +312,8 @@ def get_checker_data(n_samples, n_support, n_classes, seed=0, grid=False):
         distances = haversine_distance(lons_grid, lats_grid, lons, lats)
         labels_grid = labels[distances.argmin(0)]
 
-        lonlats = torch.from_numpy(np.stack([lons_grid, lats_grid])).T
-        labels_out = torch.from_numpy(labels_grid)
+        lonlats = torch.from_numpy(np.stack([lons_grid, lats_grid]).T.astype(np.float64))
+        labels_out = torch.from_numpy(labels_grid.astype(np.int64))
     else:
         # Random sampling on sphere
         rng = np.random.RandomState(seed)
@@ -317,8 +324,8 @@ def get_checker_data(n_samples, n_support, n_classes, seed=0, grid=False):
         distances = haversine_distance(lons_seed, lats_seed, lons, lats)
         labels_seed = labels[distances.argmin(0)]
 
-        lonlats = torch.from_numpy(np.stack([lons_seed, lats_seed])).T
-        labels_out = torch.from_numpy(labels_seed)
+        lonlats = torch.from_numpy(np.stack([lons_seed, lats_seed]).T.astype(np.float64))
+        labels_out = torch.from_numpy(labels_seed.astype(np.int64))
 
     return lonlats, labels_out
 
@@ -621,15 +628,24 @@ def evaluate_all_tasks(model, data_dir=DEFAULT_DATA_DIR, device='cuda',
         ]
 
     results = {}
-    for task in tasks:
+    for i, task in enumerate(tasks):
         try:
+            # Use fewer workers for later tasks to avoid file descriptor exhaustion
+            # After 5 tasks, reduce workers to 0 to be safe
+            task_workers = 0 if i >= 5 else num_workers
+
             score = evaluate_task(
-                task, model, data_dir, device, batch_size, num_workers
+                task, model, data_dir, device, batch_size, task_workers
             )
             results[task] = score
         except Exception as e:
             print(f"Error evaluating {task}: {e}")
             results[task] = None
+
+        # Explicit cleanup between tasks to free file descriptors
+        gc.collect()
+        if torch.cuda.is_available():
+            torch.cuda.empty_cache()
 
     # Print summary
     print("\n" + "=" * 50)
