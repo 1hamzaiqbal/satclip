@@ -353,8 +353,80 @@ After training completes:
 
 ---
 
+## Phase 6: RANGE Evaluation (Downstream Task Performance)
+
+### Overview
+
+**Objective**: Evaluate trained location encoders on RANGE benchmark tasks to measure downstream performance.
+
+**RANGE Tasks**:
+- **Classification**: biome, ecoregion, country, ocean
+- **Regression**: temperature, housing, elevation, population
+
+**Methodology**: Extract embeddings from location encoder, fit Ridge classifier/regressor, measure accuracy/R².
+
+### Results (2026-01-26)
+
+| Task | Spline+SH | SIREN+SH | Raw+Spline | Winner |
+|------|-----------|----------|------------|--------|
+| **Classification** | | | | |
+| biome | **0.7640** | 0.7632 | 0.7263 | Spline+SH |
+| ecoregion | **0.6720** | 0.6409 | 0.6164 | Spline+SH |
+| country | 0.9234 | **0.9301** | 0.9145 | SIREN+SH |
+| ocean | 0.9590 | **0.9606** | 0.9424 | SIREN+SH |
+| **Regression** | | | | |
+| temperature (R²) | 0.8986 | 0.9142 | **0.9436** | Raw+Spline |
+| housing (R²) | **0.5705** | 0.3775 | 0.4573 | Spline+SH |
+
+**Notes**:
+- elevation, population, checkerboard tasks failed due to file descriptor limits (fixed in eval_range.py)
+- Results are from best checkpoints of each model configuration
+
+### Key Findings
+
+1. **Spline+SH excels at geographic tasks**:
+   - Best on biome (+0.08% over SIREN) and ecoregion (+4.9% over SIREN)
+   - These tasks require understanding local geographic patterns
+
+2. **Similar on global position tasks**:
+   - country/ocean are about "where on Earth" - all models similar
+   - SIREN slightly better, likely due to its global smoothness properties
+
+3. **Raw coordinates for temperature**:
+   - Raw+Spline best for temperature (0.9436 R²)
+   - Temperature is strongly correlated with latitude, which raw coords encode directly
+   - Suggests SH may over-complicate simple latitude-based patterns
+
+4. **Spline dramatically better for housing**:
+   - Spline+SH: 0.5705 vs SIREN+SH: 0.3775 (+51% improvement!)
+   - Housing prices are localized - splines better capture fine-grained patterns
+
+### Evaluation Jobs
+
+| Job ID | Model | Status | Output |
+|--------|-------|--------|--------|
+| 18914 | Spline+SH | COMPLETED | `contrastive_multispectral_20260125_014617/checkpoints/eval_range/` |
+| 18915 | SIREN+SH | COMPLETED | `contrastive_multispectral_20260124_210713/checkpoints/eval_range/` |
+| 18916 | Raw+Spline | COMPLETED | `contrastive_multispectral_20260126_141110/checkpoints/eval_range/` |
+
+### Commands
+
+```bash
+# Submit evaluation for a checkpoint
+sbatch experiments/scripts/slurm/submit_eval_range.sh \
+    --checkpoint /path/to/checkpoint.ckpt
+
+# Specify subset of tasks
+sbatch experiments/scripts/slurm/submit_eval_range.sh \
+    --checkpoint /path/to/checkpoint.ckpt \
+    --tasks biome country temperature
+```
+
+---
+
 ## References
 
 - Original SatCLIP paper: [Klemmer et al., 2023]
 - TTE (Time-To-Event) repo: Pattern reference for PyTorch Lightning
 - B-spline theory: [de Boor, 1978]
+- RANGE benchmark: [Mai et al., 2023]
