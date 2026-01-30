@@ -56,7 +56,7 @@ model:
 | 18594 | 2026-01-25 | Spline (full) | 312/500 | TIMEOUT | Phase 3.1 - best val_loss=2.8870 @ epoch 99 |
 | 18829 | 2026-01-26 | Raw + per-layer spline (short) | 50 | COMPLETED | Phase 5.1 - val_loss=3.0131 @ epoch 49 |
 | 18923 | 2026-01-27 | Learnable RFF + shared spline (short) | 50 | COMPLETED | Phase 7.1 - val_loss=2.6500 @ epoch 39 |
-| 19364 | 2026-01-28 | Learnable RFF + per-layer spline (short) | 50 | RUNNING | Phase 7.2 - in progress |
+| 19364 | 2026-01-28 | Learnable RFF + per-layer spline (short) | 50 | COMPLETED | Phase 7.2 - val_loss=2.6484 @ epoch 43 |
 
 ### Job 18498: Spline Short Run (Pre-Baseline-Fix)
 
@@ -370,6 +370,16 @@ After training completes:
   - Uses identical RANGE evaluation pipeline for fair comparison
   - Loads eval data from Google Drive
 
+### 2026-01-30
+- **Phase 7.2 completed**: Job 19364 finished (50 epochs)
+  - Best val_loss=2.6484 (epoch 43), nearly identical to 7.1's shared spline (2.6500)
+  - Per-layer splines did NOT improve over shared splines for learnable RFF
+- **Phase 8 completed**: Published SatCLIP L=10 and L=40 evaluated on RANGE
+  - L=10 dominates L=40 on 8/10 tasks; L=40 catastrophically fails checkerboard (0.38 vs 0.90)
+  - Our Spline+SH and SIREN+SH models beat published SatCLIP L=10 on most tasks
+  - Temperature is the one task where published SatCLIP L=10 clearly wins (0.9480 vs 0.9436)
+  - sklearn warning on ecoregion (class with 1 member vs n_splits=10) affects cross-validation reliability
+
 ---
 
 ## Phase 6: RANGE Evaluation (Downstream Task Performance)
@@ -539,7 +549,7 @@ sbatch experiments/scripts/slurm/submit_contrastive.sh \
 
 **Job ID**: 19364
 **Run Directory**: `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/`
-**Status**: RUNNING (2026-01-28)
+**Status**: COMPLETED (2026-01-28)
 
 **Verified Configuration** (from hparams.yaml):
 ```yaml
@@ -558,14 +568,26 @@ activation_config:
 freeze_vision: true
 ```
 
-**Progress**: Epoch 1/50, val_loss=5.6324, ~3m 36s/epoch
+**Results**:
+- **Best Val Loss**: 2.6484 (epoch 43)
+- **Best Saved Checkpoint**: epoch=39-val_loss=2.6500.ckpt
+- **Training Time**: ~2m 41s/epoch, completed 50 epochs
+- **Trainable params**: 657K (location encoder)
 
-**Hypothesis**: Per-layer splines can better adapt to the learnable RFF features since each layer processes different feature distributions. Phase 7.1's shared spline may have been a bottleneck.
-
-**Monitor**:
-```bash
-ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_19364.out'
+**Saved Checkpoints**:
 ```
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/checkpoints/
+  - epoch=29-val_loss=2.6690.ckpt
+  - epoch=39-val_loss=2.6500.ckpt
+  - epoch=49-val_loss=2.6540.ckpt
+  - last.ckpt
+```
+
+**Key Findings**:
+1. Per-layer splines (best 2.6484) performed **nearly identically** to shared splines (7.1 best 2.6500)
+2. Per-layer approach did NOT provide meaningful improvement over shared splines for learnable RFF
+3. Loss trajectory stabilized around epoch 37-50 in the 2.64-2.66 range
+4. Hypothesis rejected: per-layer splines are not a bottleneck for learnable RFF encoding
 
 ### Future Experiments
 - **7.3**: Learnable RFF + SIREN (compare activation effects)
@@ -588,7 +610,7 @@ ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src
 - `microsoft/SatCLIP-ResNet18-L10` (from HuggingFace)
 - `microsoft/SatCLIP-ResNet18-L40` (from HuggingFace)
 
-**Status**: PENDING (notebook created, awaiting Colab execution)
+**Status**: COMPLETED (2026-01-29, Google Colab with Tesla T4)
 
 **Key Differences from Published SatCLIP**:
 | Aspect | Published SatCLIP | Our Implementation |
@@ -599,6 +621,53 @@ ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src
 | Training epochs | ~200+ | 50 (short runs) |
 | SIREN dropout | Yes (in hidden layers) | No |
 | Optimizer | AdamW with param groups | AdamW standard |
+
+### Results
+
+| Task | SatCLIP L=10 | SatCLIP L=40 | Metric |
+|------|-------------|-------------|--------|
+| **Classification** | | | |
+| biome | **0.7089** | 0.6942 | Accuracy |
+| ecoregion | 0.5872 | **0.6811** | Accuracy |
+| country | **0.9093** | 0.8320 | Accuracy |
+| ocean | **0.9500** | 0.8604 | Accuracy |
+| checker_100 | **0.9045** | 0.3788 | Accuracy |
+| checker_200 | **0.8349** | 0.3267 | Accuracy |
+| **Regression** | | | |
+| temperature | **0.9480** | 0.8383 | R² |
+| housing | 0.3553 | **0.3966** | R² |
+| elevation | **0.7220** | 0.6433 | R² |
+| population | **0.7507** | 0.7076 | R² |
+
+### Full Comparison (All Models)
+
+| Task | Spline+SH | SIREN+SH | Raw+Spline | LearnRFF+Spline | SatCLIP L=10 | SatCLIP L=40 |
+|------|-----------|----------|------------|-----------------|-------------|-------------|
+| biome | **0.7640** | 0.7632 | 0.7263 | 0.7122 | 0.7089 | 0.6942 |
+| ecoregion | 0.6720 | 0.6409 | 0.6164 | **0.7065** | 0.5872 | 0.6811 |
+| country | 0.9234 | **0.9301** | 0.9145 | 0.6922 | 0.9093 | 0.8320 |
+| ocean | 0.9590 | **0.9606** | 0.9424 | 0.7770 | 0.9500 | 0.8604 |
+| temperature | 0.8986 | 0.9142 | **0.9436** | 0.6387 | 0.9480 | 0.8383 |
+| housing | 0.5705 | 0.3775 | 0.4573 | **0.6145** | 0.3553 | 0.3966 |
+| elevation | 0.7341 | **0.7694** | 0.7265 | 0.5012 | 0.7220 | 0.6433 |
+| population | 0.7541 | **0.7777** | 0.7588 | 0.5906 | 0.7507 | 0.7076 |
+| checker_100 | 0.9099 | **0.9225** | 0.9275 | 0.2870 | 0.9045 | 0.3788 |
+| checker_200 | 0.8537 | **0.8719** | 0.8749 | 0.2667 | 0.8349 | 0.3267 |
+
+### Key Findings
+
+1. **L=10 dominates L=40**: L=10 outperforms L=40 on 8 of 10 tasks (L=40 only wins on ecoregion and housing)
+2. **L=40 catastrophically fails checkerboard**: 0.38/0.33 vs L=10's 0.90/0.83 — higher-order harmonics appear to hurt synthetic patterns
+3. **Our models beat published SatCLIP on most tasks**: Both Spline+SH and SIREN+SH outperform SatCLIP L=10 on biome, ecoregion, country, ocean, housing, elevation, population
+4. **Published SatCLIP wins on temperature**: L=10 achieves 0.9480 R² vs our best 0.9436 (Raw+Spline) — temperature is the one task where the published model is clearly best
+5. **Embedding dimension likely matters**: Our 512-dim vs published 256-dim may explain some of the advantage
+
+### Notes and Caveats
+
+1. **sklearn cross-validation warning**: ecoregion evaluation triggered "least populated class in y has only 1 members, which is less than n_splits=10" for both L=10 and L=40. This affects cross-validation reliability for ecoregion.
+2. **Colab environment**: PyTorch 2.9.0+cu126, Tesla T4 GPU, Python 3.12
+3. **Model loading**: Used `get_satclip()` from the original SatCLIP repo's `load.py` module, which loads the full model then extracts the location encoder
+4. **Results saved**: `satclip_range_results.csv` saved to Google Drive at `/content/drive/MyDrive/grad/learned_activations/`
 
 ---
 

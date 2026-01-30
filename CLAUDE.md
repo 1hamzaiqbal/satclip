@@ -19,7 +19,7 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 
 ---
 
-## Experiment Results Summary (2026-01-28)
+## Experiment Results Summary (2026-01-30)
 
 ### Phase 2: Short Runs (50 epochs) - COMPLETED
 | Activation | Job ID | Best Val Loss | Best Epoch |
@@ -38,7 +38,7 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 | Config | Job ID | Best Val Loss | Best Epoch | Status |
 |--------|--------|---------------|------------|--------|
 | LearnRFF + Shared Spline | 18923 | 2.6500 | 39 | COMPLETED |
-| LearnRFF + Per-Layer Spline | 19364 | TBD | TBD | RUNNING |
+| LearnRFF + Per-Layer Spline | 19364 | 2.6484 | 43 | COMPLETED |
 
 ### Phase 6: RANGE Evaluation (All Tasks, All Models)
 | Task | Spline+SH | SIREN+SH | Raw+Spline | LearnRFF+Spline |
@@ -54,10 +54,22 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 | checker_100 | 0.9099 | **0.9225** | 0.9275 | 0.2870 |
 | checker_200 | 0.8537 | 0.8719 | **0.8749** | 0.2667 |
 
-### Phase 8: Published SatCLIP Baseline
-- **Notebook**: `notebooks/RANGE_Eval_Published_SatCLIP.ipynb` (Google Colab)
-- **Models**: SatCLIP ResNet18 L=10 and L=40 from HuggingFace
-- **Status**: PENDING (awaiting Colab execution)
+### Phase 8: Published SatCLIP Baseline - COMPLETED
+| Task | SatCLIP L=10 | SatCLIP L=40 |
+|------|-------------|-------------|
+| biome | **0.7089** | 0.6942 |
+| ecoregion | 0.5872 | **0.6811** |
+| country | **0.9093** | 0.8320 |
+| ocean | **0.9500** | 0.8604 |
+| temperature | **0.9480** | 0.8383 |
+| housing | 0.3553 | **0.3966** |
+| elevation | **0.7220** | 0.6433 |
+| population | **0.7507** | 0.7076 |
+| checker_100 | **0.9045** | 0.3788 |
+| checker_200 | **0.8349** | 0.3267 |
+
+**Key**: L=10 dominates L=40 on 8/10 tasks. Our models beat L=10 on most tasks (see EXPERIMENTS.md for full comparison).
+**Note**: sklearn CV warning on ecoregion (class with 1 member < n_splits=10).
 
 ### Best Checkpoints
 ```
@@ -68,8 +80,9 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 /engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260125_103146/checkpoints/
   - epoch=99-val_loss=2.8870.ckpt  (BEST)
 
-# Phase 7.2 (in progress)
-/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/
+# Phase 7.2 (LearnRFF + Per-Layer Spline)
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/checkpoints/
+  - epoch=39-val_loss=2.6500.ckpt  (best saved)
 ```
 
 ### Training Speed
@@ -80,11 +93,7 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 
 ## Current Active Job
 
-**Job 19364** - Phase 7.2: Learnable RFF + Per-Layer Splines (50 epochs)
-```bash
-# Monitor
-ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_19364.out'
-```
+No active jobs. All experiments through Phase 8 are complete.
 
 ### Quick Check Commands
 ```bash
@@ -386,4 +395,4 @@ Based on TTE repo analysis (see local `/Users/hamzaiqbal/grad/learned_activation
 ---
 
 ## Last Updated
-2026-01-28 18:30 CST
+2026-01-30 CST
