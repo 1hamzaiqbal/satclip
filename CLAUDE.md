@@ -1,4 +1,4 @@
-# SatCLIP Project - Quick Reference
+`# SatCLIP Project - Quick Reference
 
 ## VERIFIED: Infrastructure Working
 
@@ -19,7 +19,7 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 
 ---
 
-## Experiment Results Summary (2026-01-26)
+## Experiment Results Summary (2026-01-28)
 
 ### Phase 2: Short Runs (50 epochs) - COMPLETED
 | Activation | Job ID | Best Val Loss | Best Epoch |
@@ -34,7 +34,30 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 |------------|--------|---------------|------------|--------|
 | Spline | 18594 | 2.8870 | 99 | TIMEOUT (24h limit) |
 
-**Key Finding**: Training converged early (~epoch 100), diminishing returns after.
+### Phase 7: Learnable RFF Experiments
+| Config | Job ID | Best Val Loss | Best Epoch | Status |
+|--------|--------|---------------|------------|--------|
+| LearnRFF + Shared Spline | 18923 | 2.6500 | 39 | COMPLETED |
+| LearnRFF + Per-Layer Spline | 19364 | TBD | TBD | RUNNING |
+
+### Phase 6: RANGE Evaluation (All Tasks, All Models)
+| Task | Spline+SH | SIREN+SH | Raw+Spline | LearnRFF+Spline |
+|------|-----------|----------|------------|-----------------|
+| biome | **0.7640** | 0.7632 | 0.7263 | 0.7122 |
+| ecoregion | 0.6720 | 0.6409 | 0.6164 | **0.7065** |
+| country | 0.9234 | **0.9301** | 0.9145 | 0.6922 |
+| ocean | 0.9590 | **0.9606** | 0.9424 | 0.7770 |
+| temperature | 0.8986 | 0.9142 | **0.9436** | 0.6387 |
+| housing | 0.5705 | 0.3775 | 0.4573 | **0.6145** |
+| elevation | 0.7341 | **0.7694** | 0.7265 | 0.5012 |
+| population | 0.7541 | **0.7777** | 0.7588 | 0.5906 |
+| checker_100 | 0.9099 | **0.9225** | 0.9275 | 0.2870 |
+| checker_200 | 0.8537 | 0.8719 | **0.8749** | 0.2667 |
+
+### Phase 8: Published SatCLIP Baseline
+- **Notebook**: `notebooks/RANGE_Eval_Published_SatCLIP.ipynb` (Google Colab)
+- **Models**: SatCLIP ResNet18 L=10 and L=40 from HuggingFace
+- **Status**: PENDING (awaiting Colab execution)
 
 ### Best Checkpoints
 ```
@@ -44,20 +67,24 @@ Last verified: 2026-01-26 (Jobs 18509, 18523, 18594)
 # Phase 3 Spline (full - BEST)
 /engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260125_103146/checkpoints/
   - epoch=99-val_loss=2.8870.ckpt  (BEST)
-  - epoch=109-val_loss=2.8949.ckpt
-  - epoch=119-val_loss=2.8937.ckpt
-  - last.ckpt (epoch 312)
+
+# Phase 7.2 (in progress)
+/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/
 ```
 
 ### Training Speed
-- Short runs (batch=256): ~2.5 min/epoch
+- Short runs (batch=256): ~2.5-3.5 min/epoch
 - Full runs (batch=512): ~4-4.5 min/epoch
 
 ---
 
 ## Current Active Job
 
-_No active job_
+**Job 19364** - Phase 7.2: Learnable RFF + Per-Layer Splines (50 epochs)
+```bash
+# Monitor
+ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_19364.out'
+```
 
 ### Quick Check Commands
 ```bash
@@ -232,7 +259,7 @@ ssh hiqbal@shell.engr.wustl.edu 'ls -la /engrfs/tmp/jacobsn/hiqbal_satclip/logs/
 | Option | Description |
 |--------|-------------|
 | `--activation <type>` | relu, gelu, siren, spline |
-| `--encoding <type>` | sh_l10, sh_l20 |
+| `--encoding <type>` | sh_l10, sh_l20, learnable_rff |
 | `--vision <type>` | moco_resnet18, moco_resnet50, moco_vit16 |
 | `--short` | 50 epochs (monitoring run) |
 | `--test` | 2 epochs (quick validation) |
@@ -359,4 +386,4 @@ Based on TTE repo analysis (see local `/Users/hamzaiqbal/grad/learned_activation
 ---
 
 ## Last Updated
-2026-01-26 14:00 CST
+2026-01-28 18:30 CST

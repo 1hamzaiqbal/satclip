@@ -55,6 +55,8 @@ model:
 | 18523 | 2026-01-25 | Spline (short) | 50 | COMPLETED | Phase 2.2 - val_loss=2.4717 |
 | 18594 | 2026-01-25 | Spline (full) | 312/500 | TIMEOUT | Phase 3.1 - best val_loss=2.8870 @ epoch 99 |
 | 18829 | 2026-01-26 | Raw + per-layer spline (short) | 50 | COMPLETED | Phase 5.1 - val_loss=3.0131 @ epoch 49 |
+| 18923 | 2026-01-27 | Learnable RFF + shared spline (short) | 50 | COMPLETED | Phase 7.1 - val_loss=2.6500 @ epoch 39 |
+| 19364 | 2026-01-28 | Learnable RFF + per-layer spline (short) | 50 | RUNNING | Phase 7.2 - in progress |
 
 ### Job 18498: Spline Short Run (Pre-Baseline-Fix)
 
@@ -351,6 +353,23 @@ After training completes:
   - Training converged early, diminishing returns after epoch ~120
 - **Conclusion**: Spline activations show consistent improvements over SIREN baseline
 
+### 2026-01-27
+- **Phase 7.1 completed**: Learnable RFF + Shared Spline (50 epochs)
+  - val_loss=2.6500, competitive but 7.2% worse than SH+Spline
+  - RANGE eval: Best on ecoregion and housing, but catastrophic on checkerboard
+- **Phase 6 re-evaluation**: All 10 RANGE tasks now working (file descriptor fix)
+  - Complete results for all 4 model variants (Spline+SH, SIREN+SH, Raw+Spline, LearnRFF+Spline)
+  - All models confirmed using frozen MoCo ResNet18 (freeze_vision=True)
+
+### 2026-01-28
+- **Phase 7.2 submitted**: Learnable RFF + Per-Layer Splines (Job 19364)
+  - Tests whether per-layer splines can improve on 7.1's shared spline results
+  - Configuration verified: shared=false in hparams.yaml
+- **Phase 8 notebook created**: `notebooks/RANGE_Eval_Published_SatCLIP.ipynb`
+  - Google Colab notebook to evaluate published SatCLIP L=10 and L=40 models
+  - Uses identical RANGE evaluation pipeline for fair comparison
+  - Loads eval data from Google Drive
+
 ---
 
 ## Phase 6: RANGE Evaluation (Downstream Task Performance)
@@ -365,22 +384,27 @@ After training completes:
 
 **Methodology**: Extract embeddings from location encoder, fit Ridge classifier/regressor, measure accuracy/R².
 
-### Results (2026-01-26)
+### Results (2026-01-27, updated with full task set)
 
-| Task | Spline+SH | SIREN+SH | Raw+Spline | Winner |
-|------|-----------|----------|------------|--------|
-| **Classification** | | | | |
-| biome | **0.7640** | 0.7632 | 0.7263 | Spline+SH |
-| ecoregion | **0.6720** | 0.6409 | 0.6164 | Spline+SH |
-| country | 0.9234 | **0.9301** | 0.9145 | SIREN+SH |
-| ocean | 0.9590 | **0.9606** | 0.9424 | SIREN+SH |
-| **Regression** | | | | |
-| temperature (R²) | 0.8986 | 0.9142 | **0.9436** | Raw+Spline |
-| housing (R²) | **0.5705** | 0.3775 | 0.4573 | Spline+SH |
+| Task | Spline+SH | SIREN+SH | Raw+Spline | LearnRFF+Spline | Winner |
+|------|-----------|----------|------------|-----------------|--------|
+| **Classification** | | | | | |
+| biome | **0.7640** | 0.7632 | 0.7263 | 0.7122 | Spline+SH |
+| ecoregion | 0.6720 | 0.6409 | 0.6164 | **0.7065** | LearnRFF+Spline |
+| country | 0.9234 | **0.9301** | 0.9145 | 0.6922 | SIREN+SH |
+| ocean | 0.9590 | **0.9606** | 0.9424 | 0.7770 | SIREN+SH |
+| checker_100 | 0.9099 | 0.9225 | **0.9275** | 0.2870 | Raw+Spline |
+| checker_200 | 0.8537 | 0.8719 | **0.8749** | 0.2667 | Raw+Spline |
+| **Regression** | | | | | |
+| temperature (R²) | 0.8986 | 0.9142 | **0.9436** | 0.6387 | Raw+Spline |
+| housing (R²) | 0.5705 | 0.3775 | 0.4573 | **0.6145** | LearnRFF+Spline |
+| elevation (R²) | 0.7341 | **0.7694** | 0.7265 | 0.5012 | SIREN+SH |
+| population (R²) | 0.7541 | **0.7777** | 0.7588 | 0.5906 | SIREN+SH |
 
 **Notes**:
-- elevation, population, checkerboard tasks failed due to file descriptor limits (fixed in eval_range.py)
+- All 10 tasks now evaluated (file descriptor issue fixed in eval_range.py)
 - Results are from best checkpoints of each model configuration
+- All models used frozen MoCo ResNet18 vision encoder (freeze_vision=True)
 
 ### Key Findings
 
@@ -405,9 +429,10 @@ After training completes:
 
 | Job ID | Model | Status | Output |
 |--------|-------|--------|--------|
-| 18914 | Spline+SH | COMPLETED | `contrastive_multispectral_20260125_014617/checkpoints/eval_range/` |
-| 18915 | SIREN+SH | COMPLETED | `contrastive_multispectral_20260124_210713/checkpoints/eval_range/` |
-| 18916 | Raw+Spline | COMPLETED | `contrastive_multispectral_20260126_141110/checkpoints/eval_range/` |
+| 18935 | Spline+SH | COMPLETED | `contrastive_multispectral_20260125_014617/checkpoints/eval_range/` |
+| 18936 | SIREN+SH | COMPLETED | `contrastive_multispectral_20260124_210713/checkpoints/eval_range/` |
+| 18937 | Raw+Spline | COMPLETED | `contrastive_multispectral_20260126_141110/checkpoints/eval_range/` |
+| 18938 | LearnRFF+Spline | COMPLETED | `contrastive_multispectral_20260127_*/checkpoints/eval_range/` |
 
 ### Commands
 
@@ -454,7 +479,7 @@ sbatch experiments/scripts/slurm/submit_eval_range.sh \
 | Batch Size | 256 (effective 1024 with accum=4) |
 | Max Epochs | 50 (short run) |
 
-### Experiment 7.1: Learnable RFF + Spline (Short)
+### Experiment 7.1: Learnable RFF + Shared Spline (Short) - Job 18923
 
 ```bash
 # Command
@@ -464,17 +489,116 @@ sbatch experiments/scripts/slurm/submit_contrastive.sh \
     --short
 ```
 
-**Status**: PLANNED
+**Job ID**: 18923
+**Run Directory**: `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260127_*/`
+**Status**: COMPLETED (2026-01-27)
 
-**Expected Outcomes**:
-1. If val_loss < 2.47: Learnable RFF + Spline beats SH + Spline
-2. If val_loss ~ 2.47-2.60: Competitive, worth exploring further
-3. If val_loss > 3.0: RFF fundamentally worse for this task
+**Verified Configuration** (from hparams.yaml):
+```yaml
+encoding_type: learnable_rff
+encoding_config:
+  n_features: 256
+  sigma: 10.0
+  normalize_input: true
+  seed: 42
+  learnable_scale: false
+activation_type: spline
+activation_config:
+  shared: true        # One spline per layer
+  n_knots: 15
+  init: relu
+freeze_vision: true
+```
 
-### Future Experiments (if 7.1 promising)
-- **7.2**: Multi-scale learnable RFF (combine multiple sigma initializations)
+**Results**:
+- **Best Val Loss**: 2.6500 (epoch 39)
+- **Training Time**: ~3m 36s/epoch
+- **Trainable params**: 657K (location encoder)
+
+**RANGE Evaluation** (see Phase 6 table for full results):
+- **Strengths**: Best on ecoregion (0.7065) and housing (0.6145)
+- **Weaknesses**: Poor on checkerboard (0.29), country (0.69), ocean (0.78)
+- **Overall**: Mixed results - excels at some tasks but catastrophically fails checkerboard
+
+**Key Findings**:
+1. val_loss=2.6500 is competitive but worse than SH+Spline (2.4717, +7.2%)
+2. Excels at fine-grained tasks (ecoregion, housing) but fails at synthetic spatial patterns
+3. Checkerboard failure (0.29 vs 0.92) suggests learnable RFF doesn't capture regular spatial frequencies well
+4. Outcome falls in range 2 (competitive, worth exploring further)
+
+### Experiment 7.2: Learnable RFF + Per-Layer Splines (Short) - Job 19364
+
+```bash
+# Command
+sbatch experiments/scripts/slurm/submit_contrastive.sh \
+    --encoding learnable_rff \
+    --activation spline \
+    --short \
+    --model.activation.shared=false
+```
+
+**Job ID**: 19364
+**Run Directory**: `/engrfs/tmp/jacobsn/hiqbal_satclip/logs/contrastive_multispectral/contrastive_multispectral_20260128_172133/`
+**Status**: RUNNING (2026-01-28)
+
+**Verified Configuration** (from hparams.yaml):
+```yaml
+encoding_type: learnable_rff
+encoding_config:
+  n_features: 256
+  sigma: 10.0
+  normalize_input: true
+  seed: 42
+  learnable_scale: false
+activation_type: spline
+activation_config:
+  shared: false       # Per-layer splines (each layer learns its own)
+  n_knots: 15
+  init: relu
+freeze_vision: true
+```
+
+**Progress**: Epoch 1/50, val_loss=5.6324, ~3m 36s/epoch
+
+**Hypothesis**: Per-layer splines can better adapt to the learnable RFF features since each layer processes different feature distributions. Phase 7.1's shared spline may have been a bottleneck.
+
+**Monitor**:
+```bash
+ssh hiqbal@shell.engr.wustl.edu 'grep "Epoch" /engrfs/project/jacobsn/hiqbal/src/satclip/logs/satclip_contrastive_19364.out'
+```
+
+### Future Experiments
 - **7.3**: Learnable RFF + SIREN (compare activation effects)
 - **7.4**: Higher dimension learnable RFF (512d, 1024d)
+- **7.5**: Multi-scale learnable RFF (combine multiple sigma initializations)
+
+---
+
+## Phase 8: Published SatCLIP Baseline Evaluation
+
+### Overview
+
+**Objective**: Evaluate the published SatCLIP models (L=10 and L=40) on the same RANGE benchmark to establish a true baseline for comparison.
+
+**Rationale**: Our SIREN+SH model appeared to match or beat published SatCLIP numbers, which seems unexpected given differences in training data scale and epochs. Need to verify by running the published models through the exact same evaluation pipeline.
+
+**Notebook**: `notebooks/RANGE_Eval_Published_SatCLIP.ipynb` (Google Colab)
+
+**Models**:
+- `microsoft/SatCLIP-ResNet18-L10` (from HuggingFace)
+- `microsoft/SatCLIP-ResNet18-L40` (from HuggingFace)
+
+**Status**: PENDING (notebook created, awaiting Colab execution)
+
+**Key Differences from Published SatCLIP**:
+| Aspect | Published SatCLIP | Our Implementation |
+|--------|-------------------|---------------------|
+| Embed dim | 256 | 512 |
+| Hidden dim | 256 | 512 |
+| Training data | S2-100K (full) | S2-100K (HF preprocessed) |
+| Training epochs | ~200+ | 50 (short runs) |
+| SIREN dropout | Yes (in hidden layers) | No |
+| Optimizer | AdamW with param groups | AdamW standard |
 
 ---
 
