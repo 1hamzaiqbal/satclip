@@ -1,0 +1,15 @@
+# Gated Spline activation configuration
+# GLU-style gating: spline(x) * sigmoid(gate_spline(x))
+#
+# The gate spline learns an input-dependent mask that selectively
+# suppresses or amplifies the primary spline's output per-element.
+
+model:
+  activation:
+    type: "gated_spline"
+    n_knots: 15
+    input_range: [-3.0, 3.0]
+    init: "relu"       # Primary spline initialization
+    gate_init: "linear"  # Gate spline initialization
+    learnable_positions: false
+    shared: true  # One gated activation shared across layers

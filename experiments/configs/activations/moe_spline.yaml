@@ -1,0 +1,17 @@
+# MoE Spline activation configuration
+# Mixture-of-Experts with input-dependent routing
+#
+# Each expert is a SplineActivation initialized differently,
+# allowing the network to select different activation patterns
+# per input (e.g., smooth vs sharp transitions).
+
+model:
+  activation:
+    type: "moe_spline"
+    n_experts: 4
+    n_knots: 15
+    input_range: [-3.0, 3.0]
+    expert_inits: ["relu", "tanh", "gelu", "linear"]
+    load_balance_weight: 0.0  # Set >0 to penalize uneven expert usage
+    learnable_positions: false
+    shared: true  # One MoE activation shared across layers

@@ -5,12 +5,16 @@ Modular activation functions for location encoders:
 - SIREN (sinusoidal)
 - Spline (learned)
 - RFF (Random Fourier Features)
+- MoE Spline (mixture-of-experts spline)
+- Gated Spline (GLU-style gated spline)
 """
 
 from .relu import ReLUActivation
 from .siren import SIRENActivation, Sine
 from .spline import SplineActivation
 from .rff import RFFActivation
+from .moe_spline import MoESplineActivation
+from .gated_spline import GatedSplineActivation
 
 __all__ = [
     "ReLUActivation",
@@ -18,6 +22,8 @@ __all__ = [
     "Sine",
     "SplineActivation",
     "RFFActivation",
+    "MoESplineActivation",
+    "GatedSplineActivation",
 ]
 
 # Registry for easy config-based instantiation
@@ -26,6 +32,8 @@ ACTIVATION_REGISTRY = {
     "siren": SIRENActivation,
     "spline": SplineActivation,
     "rff": RFFActivation,
+    "moe_spline": MoESplineActivation,
+    "gated_spline": GatedSplineActivation,
 }
 
 
